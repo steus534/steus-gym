@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>솔 에르다 조각 & 메소 통합 계산기 (시간 추정)</title>
+    <style>
+        body {
+            font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+            background-color: #212529;
+            color: #f8f9fa;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px 0;
+        }
+        .container {
+            background-color: #343a40;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            width: 400px;
+        }
+        h2 { text-align: center; margin-bottom: 1.5rem; color: #ffc107; }
+        
+        .section-title {
+            font-size: 0.85rem;
+            color: #adb5bd;
+            border-bottom: 1px solid #495057;
+            padding-bottom: 5px;
+            margin-top: 1.5rem;
+            margin-bottom: 1rem;
+        }
+        
+        .input-row { display: flex; gap: 10px; margin-bottom: 1rem; }
+        .input-group { flex: 1; }
+        
+        label { display: block; margin-bottom: 0.5rem; font-weight: bold; font-size: 0.9rem;}
+        input {
+            width: 100%;
+            padding: 0.5rem;
+            border: 1px solid #495057;
+            border-radius: 4px;
+            background-color: #495057;
+            color: #fff;
+            box-sizing: border-box;
+        }
+        
+        button {
+            width: 100%;
+            padding: 0.75rem;
+            background-color: #0d6efd;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 1rem;
+            cursor: pointer;
+            margin-top: 1.5rem;
+        }
+        button:hover { background-color: #0b5ed7; }
+        
+        .result {
+            margin-top: 1.5rem;
+            padding: 1rem;
+            background-color: #495057;
+            border-radius: 4px;
+        }
+        .result-block {
+            margin-bottom: 1.2rem;
+            border-bottom: 1px solid #6c757d;
+            padding-bottom: 0.8rem;
+        }
+        .result-block:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
+        }
+        .result-header { font-size: 1rem; font-weight:bold; color: #fff; margin-bottom: 5px; }
+        .sub-text { font-size: 0.85rem; color: #ced4da; margin-bottom: 4px; display: flex; justify-content: space-between;}
+        .total-val { color: #ffc107; font-weight: bold; font-size: 1.1rem; text-align: right; display: block; margin-top:5px;}
+        
+        /* 상한 경고 스타일 */
+        .cap-time { font-size: 1rem; color: #ff6b6b; font-weight: bold; text-align: right; margin-top: 5px; }
+        
+        .disclaimer {
+            font-size: 0.75rem;
+            color: #adb5bd;
+            margin-top: 1rem;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>🧩 드랍 & 메소 계산기</h2>
+    
+    <div class="section-title">캐릭터 및 몬스터 정보</div>
+    <div class="input-row">
+        <div class="input-group">
+            <label>캐릭터 레벨</label>
+            <input type="number" id="charLevel" placeholder="예: 285">
+        </div>
+        <div class="input-group">
+            <label>몬스터 레벨</label>
+            <input type="number" id="mobLevel" placeholder="예: 280">
+        </div>
+    </div>
+    
+    <div class="section-title">스펙 설정</div>
+    <div class="input-row">
+        <div class="input-group">
+            <label>아획 (%)</label>
+            <input type="number" id="dropRate" placeholder="예: 67">
+        </div>
+        <div class="input-group">
+            <label>메획 (%)</label>
+            <input type="number" id="mesoRate" placeholder="예: 100">
+        </div>
+    </div>
+    
+    <div class="input-row">
+        <div class="input-group">
+            <label>6분 마릿수</label>
+            <input type="number" id="mobCount" placeholder="예: 1800">
+        </div>
+        <div class="input-group">
+            <label>조각 시세(만)</label>
+            <input type="number" id="piecePrice" placeholder="예: 600">
+        </div>
+    </div>
+
+    <button onclick="calculate()">계산하기</button>
+
+    <div class="result" id="resultBox" style="display:none;">
+        
+        <div class="result-block">
+            <div class="result-header">💰 1재획 (2시간) 총 수익</div>
+            <div class="total-val" id="totalWapRevenue">0 메소</div>
+            <div class="sub-text" style="margin-top:5px;">
+                <span>순수 메소:</span> <span id="wapPureMeso">0</span>
+            </div>
+            <div class="sub-text">
+                <span>조각 판매:</span> <span id="wapPieceMeso">0</span>
+            </div>
+            <div class="sub-text">
+                <span>조각 갯수:</span> <span id="wapPieceCount">0개</span>
+            </div>
+        </div>
+
+        <div class="result-block">
+            <div class="result-header">🚧 일일 필드 메소 제한</div>
+            <div class="sub-text">
+                <span>내 상한선:</span> <span id="myCap" style="color:#fff;">0</span>
+            </div>
+            <div class="sub-text">
+                <span>상한 도달 소요 시간:</span>
+            </div>
+            <div class="cap-time" id="timeToCap">약 0시간 0분</div>
+        </div>
+
+        <div class="result-block" style="border:none;">
+             <div class="sub-text">레벨 페널티 적용: <span id="penaltyDisp" style="color:#fff;">100%</span></div>
+        </div>
+
+    </div>
+
+    <div class="disclaimer">
+        * 조각 드랍: 인벤 로그함수 모델 적용<br>
+        * 메소: 기본 7.5배 * 레벨 반감 * 메획% 적용<br>
+        * 상한 시간: 기본 메소 누적 속도 기준 (단순 추정)
+    </div>
+</div>
+
+<script>
+    function formatKoreanMoney(amount) {
+        if (amount <= 0) return "0 메소";
+        const EOK = 100000000;
+        const MAN = 10000;
+        let result = "";
+        
+        const eokUnit = Math.floor(amount / EOK);
+        const remainderEok = amount % EOK;
+        
+        if (eokUnit > 0) result += `${eokUnit}억 `;
+        
+        const manUnit = Math.floor(remainderEok / MAN);
+        const remainderMan = remainderEok % MAN;
+        
+        if (manUnit > 0) result += `${manUnit}만 `;
+        if (remainderMan > 0) result += `${Math.floor(remainderMan)}`;
+        
+        return result.trim() + " 메소";
+    }
+
+    function getLevelMultiplier(diff) {
+        if (diff >= 30) return 0;
+        if (diff === 29) return 0.03;
+        if (diff === 28) return 0.16;
+        if (diff === 27) return 0.24;
+        if (diff === 26) return 0.35;
+        if (diff === 25) return 0.45;
+        if (diff === 24) return 0.54;
+        if (diff === 23) return 0.62;
+        if (diff === 22) return 0.69;
+        if (diff === 21) return 0.75;
+        if (diff === 20) return 0.80;
+        if (diff === 19) return 0.82;
+        if (diff === 18) return 0.84;
+        if (diff === 17) return 0.86;
+        if (diff === 16) return 0.88;
+        if (diff === 15) return 0.90;
+        if (diff === 14) return 0.92;
+        if (diff === 13) return 0.94;
+        if (diff === 12) return 0.96;
+        if (diff === 11) return 0.98;
+        if (diff <= 10 && diff >= -10) return 1.0;
+        if (diff === -11) return 0.97;
+        if (diff === -12) return 0.94;
+        if (diff === -13) return 0.91;
+        if (diff === -14) return 0.88;
+        if (diff === -15) return 0.85;
+        if (diff === -16) return 0.82;
+        if (diff === -17) return 0.79;
+        if (diff === -18) return 0.76;
+        if (diff === -19) return 0.73;
+        if (diff === -20) return 0.70;
+        if (diff === -21) return 0.65;
+        if (diff === -22) return 0.60;
+        if (diff === -23) return 0.55;
+        if (diff === -24) return 0.50;
+        if (diff === -25) return 0.45;
+        if (diff === -26) return 0.40;
+        if (diff === -27) return 0.35;
+        if (diff === -28) return 0.30;
+        if (diff === -29) return 0.25;
+        if (diff === -30) return 0.20;
+        if (diff === -31) return 0.15;
+        if (diff === -32) return 0.10;
+        if (diff === -33) return 0.05;
+        return 0; 
+    }
+
+    function getDailyMesoCap(level) {
+        if (level < 100) return 20000000;
+        if (level < 200) return 40000000;
+        if (level < 260) {
+            const extra = Math.floor((level - 200) / 5) * 5000000;
+            return 80000000 + extra;
+        } else {
+            const extra = Math.floor((level - 260) / 5) * 10000000;
+            return 150000000 + extra;
+        }
+    }
+
+    function calculate() {
+        const charLevel = parseInt(document.getElementById('charLevel').value);
+        const mobLevel = parseInt(document.getElementById('mobLevel').value);
+        const dropRate = parseFloat(document.getElementById('dropRate').value);
+        const mesoRate = parseFloat(document.getElementById('mesoRate').value) || 0;
+        const mobCount = parseFloat(document.getElementById('mobCount').value);
+        const piecePriceInput = parseFloat(document.getElementById('piecePrice').value) || 0;
+        const piecePrice = piecePriceInput * 10000;
+
+        if (!charLevel || !mobLevel || !dropRate || !mobCount) {
+            alert("빈칸을 모두 채워줘.");
+            return;
+        }
+
+        // 1. 조각
+        const BASE_PIECE_RATE = 0.000425;
+        const pieceEffFactor = 1 + Math.log(1 + (dropRate / 100));
+        const realPieceRate = BASE_PIECE_RATE * pieceEffFactor;
+        const mobsPerWap = mobCount * 20; 
+        
+        const pieceCountWap = mobsPerWap * realPieceRate;
+        const pieceRevenueWap = Math.floor(pieceCountWap * piecePrice);
+
+        // 2. 메소
+        const diff = mobLevel - charLevel;
+        const levelMult = getLevelMultiplier(diff);
+        const unitBaseMeso = mobLevel * 7.5; // 몬스터 1마리당 기본 드랍(평균)
+        const realMesoPerMob = unitBaseMeso * levelMult * (1 + (mesoRate / 100));
+        const mesoRevenueWap = Math.floor(mobsPerWap * realMesoPerMob);
+
+        // 3. 상한 시간 계산 (수정됨)
+        const myDailyCap = getDailyMesoCap(charLevel);
+        
+        // 분당 획득 기본 메소 (페널티/메획 적용 전)
+        const mobsPerMin = mobCount / 6; 
+        const baseMesoPerMin = unitBaseMeso * mobsPerMin;
+
+        let timeString = "계산 불가";
+        if (baseMesoPerMin > 0) {
+            const minutesToCap = myDailyCap / baseMesoPerMin;
+            const hours = Math.floor(minutesToCap / 60);
+            const mins = Math.floor(minutesToCap % 60);
+            timeString = `약 ${hours}시간 ${mins}분`; // '약' 추가
+        }
+
+        // 출력
+        document.getElementById('totalWapRevenue').innerText = formatKoreanMoney(pieceRevenueWap + mesoRevenueWap);
+        document.getElementById('wapPureMeso').innerText = formatKoreanMoney(mesoRevenueWap);
+        document.getElementById('wapPieceMeso').innerText = formatKoreanMoney(pieceRevenueWap);
+        document.getElementById('wapPieceCount').innerText = pieceCountWap.toFixed(2) + " 개";
+        
+        document.getElementById('myCap').innerText = formatKoreanMoney(myDailyCap);
+        document.getElementById('timeToCap').innerText = timeString;
+
+        document.getElementById('penaltyDisp').innerText = (levelMult * 100).toFixed(0) + "% (배율 " + levelMult.toFixed(2) + ")";
+
+        document.getElementById('resultBox').style.display = 'block';
+    }
+</script>
+
+</body>
+</html>
