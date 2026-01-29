@@ -1,0 +1,62 @@
+[
+  {
+    "date": "2026-01-27",
+    "lift": "squat",
+    "weight": 160.0,
+    "reps": 1,
+    "sets": 1,
+    "is_comp": false,
+    "bodyweight": 80.0,
+    "gender": "male",
+    "volume": 160.0,
+    "est_1rm": 165.3
+  },
+  {
+    "date": "2026-01-26",
+    "lift": "bench",
+    "weight": 100.0,
+    "reps": 1,
+    "sets": 1,
+    "is_comp": false,
+    "bodyweight": 80.0,
+    "gender": "male",
+    "volume": 100.0,
+    "est_1rm": 103.3
+  },
+  {
+    "date": "2026-01-27",
+    "lift": "squat",
+    "weight": 140.0,
+    "reps": 3,
+    "sets": 2,
+    "is_comp": false,
+    "bodyweight": 80.0,
+    "gender": "male",
+    "volume": 840.0,
+    "est_1rm": 154.0
+  },
+  {
+    "date": "2026-01-26",
+    "lift": "bench",
+    "weight": 100.0,
+    "reps": 1,
+    "sets": 1,
+    "is_comp": false,
+    "bodyweight": 80.0,
+    "gender": "male",
+    "volume": 100.0,
+    "est_1rm": 103.3
+  },
+  {
+    "date": "2026-01-27",
+    "lift": "squat",
+    "weight": 160.0,
+    "reps": 1,
+    "sets": 1,
+    "is_comp": false,
+    "bodyweight": 80.0,
+    "gender": "male",
+    "volume": 160.0,
+    "est_1rm": 165.3
+  }
+]
