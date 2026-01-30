@@ -1,8 +1,8 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { FaHome, FaChartLine, FaTable, FaBook, FaCircleNotch, FaUtensils, FaHeartbeat, FaDumbbell } from "react-icons/fa";
-import AuthButton from "./AuthButton"; // [수정됨] 같은 폴더에 있으므로 ./ 사용
+import { FaHome, FaChartLine, FaTable, FaBook, FaCircleNotch, FaUtensils, FaHeartbeat, FaEdit } from "react-icons/fa";
+import AuthButton from "./AuthButton";
 
 export default function Sidebar() {
   const pathname = usePathname();
@@ -11,6 +11,7 @@ export default function Sidebar() {
     { name: "메인 (스펙분석)", path: "/", icon: <FaHome /> },
     { name: "식단 가이드", path: "/diet", icon: <FaUtensils /> },
     { name: "성장 그래프", path: "/history", icon: <FaChartLine /> },
+    { name: "블로그", path: "/admin", icon: <FaEdit /> }, // [NEW] 관리자 전용
     { name: "프로그램 가이드", path: "/programs", icon: <FaBook /> },
     { name: "유산소 가이드", path: "/cardio", icon: <FaHeartbeat /> },
     { name: "RPE 계산기", path: "/rpe", icon: <FaTable /> },
@@ -36,11 +37,9 @@ export default function Sidebar() {
         })}
       </nav>
 
-      {/* [NEW] 하단 로그인 버튼 영역 */}
       <div className="w-full mt-4 hidden lg:block">
         <AuthButton />
       </div>
-      {/* 모바일용 (아이콘만 보일 때도 로그인 버튼 표시) */}
       <div className="w-full mt-4 lg:hidden">
         <AuthButton /> 
       </div>
