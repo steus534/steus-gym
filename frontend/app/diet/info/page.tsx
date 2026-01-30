@@ -108,8 +108,6 @@ export default function NutrientInfo() {
             </div>
           </section>
 
-          
-
           {/* 3. 무기질 & 식이섬유 */}
           <section className="grid md:grid-cols-2 gap-6">
             <div className="bg-zinc-900 p-8 rounded-[3rem] border border-zinc-800 space-y-6">
