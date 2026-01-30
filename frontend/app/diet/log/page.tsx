@@ -8,7 +8,7 @@ import {
 
 const MEAL_KO: Record<string, string> = { breakfast: "아침", lunch: "점심", dinner: "저녁", snack: "간식" };
 
-// 기존 26개 식품 DB 전체 (생략 없음)
+// 기존 26개 식품 DB (생략 없음)
 const FOOD_DB = [
   { id: 1, name: "햇반 (기본)", base: 210, unit: "g", cal: 315, c: 70, p: 5, f: 1, cat: "탄수" },
   { id: 2, name: "햇반 (작은공기)", base: 130, unit: "g", cal: 195, c: 43, p: 3, f: 0.5, cat: "탄수" },
@@ -39,7 +39,7 @@ const FOOD_DB = [
 export default function DietLog() {
   const [user, setUser] = useState<any>(null);
   
-  // [수정 포인트] 초기값 0으로 설정 (DB에서 가져오면 채워짐)
+  // 목표치 상태
   const [target, setTarget] = useState({ cal: 0, p: 0, c: 0, f: 0 });
   
   const [myDiet, setMyDiet] = useState<Record<string, any[]>>({ breakfast: [], lunch: [], dinner: [], snack: [] });
@@ -68,16 +68,15 @@ export default function DietLog() {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
         setUser(session.user);
-        await fetchUserData(session.user.id); // 목표치 가져오기
-        await fetchAssets(session.user.id);   // 커스텀 음식 가져오기
-        await fetchDailyDiet(session.user.id, date); // 식단 기록 가져오기
+        await fetchUserData(session.user.id);
+        await fetchAssets(session.user.id);
+        await fetchDailyDiet(session.user.id, date);
       }
       setIsLoaded(true);
     };
     init();
   }, [date]);
 
-  // [핵심 기능] DB에서 사용자 목표 칼로리 및 탄단지 가져오기
   const fetchUserData = async (userId: string) => {
     const { data: profile } = await supabase
       .from('profiles')
@@ -86,7 +85,6 @@ export default function DietLog() {
       .single();
 
     if (profile) {
-      // DB 값이 있으면 쓰고, 없으면 기본값(2500) 사용
       setTarget({
         cal: profile.target_cal || 2500,
         c: profile.target_carb || 300,
@@ -144,22 +142,26 @@ export default function DietLog() {
   if (!isLoaded) return <div className="bg-black min-h-screen"></div>;
 
   return (
-    <div className="flex min-h-screen bg-zinc-950 text-white font-sans overflow-hidden">
+    // [중요] h-screen과 overflow-hidden으로 전체 페이지 스크롤 방지
+    <div className="flex h-screen bg-zinc-950 text-white font-sans overflow-hidden">
       <Sidebar />
-      <main className="flex-1 p-4 md:p-8 overflow-y-auto h-screen flex flex-col xl:flex-row gap-8 custom-scrollbar">
+      {/* 메인 영역도 h-screen 내에서 스크롤 처리 */}
+      <main className="flex-1 flex flex-col xl:flex-row overflow-hidden custom-scrollbar">
         
-        {/* 왼쪽 섹션: DB 및 커스텀 음식 */}
-        <div className="xl:w-1/3 flex flex-col gap-6">
-          <h1 className="text-4xl font-black italic text-lime-500 uppercase tracking-tighter">Diet DB</h1>
-          <div className="bg-zinc-900/50 p-6 rounded-[2.5rem] border border-zinc-800 flex-1 flex flex-col overflow-hidden">
-             <div className="flex gap-3 mb-6">
+        {/* [섹션 1] 음식 DB: 모바일/태블릿에서는 높이를 제한해서 스크롤 압박 해결 */}
+        <div className="w-full xl:w-1/3 flex flex-col p-4 md:p-8 gap-6 shrink-0 h-[500px] xl:h-auto border-b xl:border-b-0 border-zinc-800 xl:border-r">
+          <h1 className="text-4xl font-black italic text-lime-500 uppercase tracking-tighter shrink-0">Diet DB</h1>
+          
+          <div className="bg-zinc-900/50 p-6 rounded-[2.5rem] border border-zinc-800 flex-1 flex flex-col overflow-hidden shadow-inner">
+             <div className="flex gap-3 mb-6 shrink-0">
                <div className="relative flex-1">
                  <FaSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" />
                  <input type="text" placeholder="식품 검색..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full p-4 pl-12 bg-black border border-zinc-800 rounded-2xl font-bold outline-none focus:border-lime-500 transition-all" />
                </div>
-               <button onClick={() => setAddFoodModal(true)} className="bg-zinc-800 hover:bg-lime-500 px-4 rounded-2xl font-black text-[10px] uppercase transition-all">+ Custom</button>
+               <button onClick={() => setAddFoodModal(true)} className="bg-zinc-800 hover:bg-lime-500 px-4 rounded-2xl font-black text-[10px] uppercase transition-all whitespace-nowrap">+ Custom</button>
              </div>
 
+             {/* [핵심] DB 리스트만 따로 스크롤 (overflow-y-auto) */}
              <div className="flex-1 overflow-y-auto space-y-3 pr-2 custom-scrollbar">
                {[...userFoods, ...FOOD_DB].filter(f => f.name.includes(search)).map(food => (
                  <div key={food.id} className="bg-zinc-800/80 p-5 rounded-3xl border border-zinc-800 group transition-all hover:border-zinc-700">
@@ -179,16 +181,15 @@ export default function DietLog() {
           </div>
         </div>
 
-        {/* 오른쪽 섹션: 기록 대시보드 */}
-        <div className="xl:w-2/3 flex flex-col gap-6 pb-20">
-          <div className="flex items-center justify-between bg-zinc-900 p-4 rounded-[2.5rem] border border-zinc-800 shadow-lg">
+        {/* [섹션 2] 기록 대시보드: 남은 영역을 채우고 내용 많으면 스크롤 */}
+        <div className="w-full xl:w-2/3 flex flex-col gap-6 p-4 md:p-8 overflow-y-auto custom-scrollbar pb-20">
+          <div className="flex items-center justify-between bg-zinc-900 p-4 rounded-[2.5rem] border border-zinc-800 shadow-lg shrink-0">
              <button onClick={() => setDate(d => new Date(new Date(d).setDate(new Date(d).getDate()-1)).toISOString().split("T")[0])} className="p-4 bg-black rounded-full hover:bg-zinc-800 transition-colors"><FaChevronLeft className="text-zinc-500"/></button>
              <h2 className="text-2xl font-black tracking-tighter italic">{date}</h2>
              <button onClick={() => setDate(d => new Date(new Date(d).setDate(new Date(d).getDate()+1)).toISOString().split("T")[0])} className="p-4 bg-black rounded-full hover:bg-zinc-800 transition-colors"><FaChevronRight className="text-zinc-500"/></button>
           </div>
 
-          <div className="bg-zinc-900 p-8 rounded-[3.5rem] border border-zinc-800 grid grid-cols-2 md:grid-cols-4 gap-8 shadow-xl">
-            {/* 여기가 이제 DB에서 불러온 target 값으로 움직임 */}
+          <div className="bg-zinc-900 p-8 rounded-[3.5rem] border border-zinc-800 grid grid-cols-2 md:grid-cols-4 gap-8 shadow-xl shrink-0">
             <ProgressBar label="KCAL" current={total.cal} target={target.cal} color="bg-lime-500" unit="kcal" />
             <ProgressBar label="PROT" current={total.p} target={target.p} color="bg-blue-500" unit="g" />
             <ProgressBar label="CARB" current={total.c} target={target.c} color="bg-orange-500" unit="g" />
@@ -200,7 +201,7 @@ export default function DietLog() {
               <div key={type} className="bg-zinc-900/30 p-6 rounded-[2.5rem] border border-zinc-800 flex flex-col min-h-[200px]">
                 <h3 className="font-black text-xs text-zinc-500 uppercase tracking-[0.3em] mb-4">{MEAL_KO[type]}</h3> 
                 <div className="space-y-2">
-                  {myDiet[type].map((f: any) => (
+                  {myDiet[type].length > 0 ? myDiet[type].map((f: any) => (
                     <div key={f.uuid} className="flex justify-between items-center bg-black/60 p-4 rounded-2xl border border-zinc-800 transition-all hover:border-zinc-700 group">
                       <div>
                         <p className="text-sm font-black text-zinc-100">{f.food_name} <span className="text-lime-500 text-[10px]">({f.amount}{f.unit})</span></p>
@@ -208,7 +209,9 @@ export default function DietLog() {
                       </div>
                       <button onClick={() => removeFood(f.uuid)} className="text-zinc-800 group-hover:text-red-500 transition-colors p-2"><FaTrash size={14}/></button>
                     </div>
-                  ))}
+                  )) : (
+                    <p className="text-zinc-700 text-xs italic text-center py-4">기록 없음</p>
+                  )}
                 </div>
               </div>
             ))}
