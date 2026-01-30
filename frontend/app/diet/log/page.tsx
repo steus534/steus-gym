@@ -8,7 +8,6 @@ import {
 
 const MEAL_KO: Record<string, string> = { breakfast: "아침", lunch: "점심", dinner: "저녁", snack: "간식" };
 
-// 기존 26개 식품 DB (생략 없음)
 const FOOD_DB = [
   { id: 1, name: "햇반 (기본)", base: 210, unit: "g", cal: 315, c: 70, p: 5, f: 1, cat: "탄수" },
   { id: 2, name: "햇반 (작은공기)", base: 130, unit: "g", cal: 195, c: 43, p: 3, f: 0.5, cat: "탄수" },
@@ -38,10 +37,7 @@ const FOOD_DB = [
 
 export default function DietLog() {
   const [user, setUser] = useState<any>(null);
-  
-  // 목표치 상태
   const [target, setTarget] = useState({ cal: 0, p: 0, c: 0, f: 0 });
-  
   const [myDiet, setMyDiet] = useState<Record<string, any[]>>({ breakfast: [], lunch: [], dinner: [], snack: [] });
   const [userFoods, setUserFoods] = useState<any[]>([]);
   const [userPresets, setUserPresets] = useState<any[]>([]);
@@ -57,7 +53,6 @@ export default function DietLog() {
   
   const [newFoodForm, setNewFoodForm] = useState({ name: "", cal: 0, c: 0, p: 0, f: 0, base: 100, unit: "g" });
 
-  // 커스텀 음식 칼로리 자동 계산
   useEffect(() => {
     const autoCal = (Number(newFoodForm.c) * 4) + (Number(newFoodForm.p) * 4) + (Number(newFoodForm.f) * 9);
     setNewFoodForm(prev => ({ ...prev, cal: autoCal }));
@@ -78,12 +73,7 @@ export default function DietLog() {
   }, [date]);
 
   const fetchUserData = async (userId: string) => {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('target_cal, target_carb, target_prot, target_fat')
-      .eq('id', userId)
-      .single();
-
+    const { data: profile } = await supabase.from('profiles').select('target_cal, target_carb, target_prot, target_fat').eq('id', userId).single();
     if (profile) {
       setTarget({
         cal: profile.target_cal || 2500,
@@ -142,37 +132,34 @@ export default function DietLog() {
   if (!isLoaded) return <div className="bg-black min-h-screen"></div>;
 
   return (
-    // [중요] h-screen과 overflow-hidden으로 전체 페이지 스크롤 방지
     <div className="flex h-screen bg-zinc-950 text-white font-sans overflow-hidden">
       <Sidebar />
-      {/* 메인 영역도 h-screen 내에서 스크롤 처리 */}
       <main className="flex-1 flex flex-col xl:flex-row overflow-hidden custom-scrollbar">
         
-        {/* [섹션 1] 음식 DB: 모바일/태블릿에서는 높이를 제한해서 스크롤 압박 해결 */}
-        <div className="w-full xl:w-1/3 flex flex-col p-4 md:p-8 gap-6 shrink-0 h-[500px] xl:h-auto border-b xl:border-b-0 border-zinc-800 xl:border-r">
-          <h1 className="text-4xl font-black italic text-lime-500 uppercase tracking-tighter shrink-0">Diet DB</h1>
+        <div className="w-full xl:w-1/3 flex flex-col p-4 md:p-8 gap-6 shrink-0 h-[35vh] xl:h-auto border-b xl:border-b-0 border-zinc-800 xl:border-r">
+          {/* [수정 포인트] 모바일 여백 추가 */}
+          <h1 className="mt-14 md:mt-0 text-3xl md:text-4xl font-black italic text-lime-500 uppercase tracking-tighter shrink-0">Diet DB</h1>
           
-          <div className="bg-zinc-900/50 p-6 rounded-[2.5rem] border border-zinc-800 flex-1 flex flex-col overflow-hidden shadow-inner">
-             <div className="flex gap-3 mb-6 shrink-0">
+          <div className="bg-zinc-900/50 p-4 md:p-6 rounded-[2.5rem] border border-zinc-800 flex-1 flex flex-col overflow-hidden shadow-inner">
+             <div className="flex gap-2 mb-4 shrink-0">
                <div className="relative flex-1">
-                 <FaSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" />
-                 <input type="text" placeholder="식품 검색..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full p-4 pl-12 bg-black border border-zinc-800 rounded-2xl font-bold outline-none focus:border-lime-500 transition-all" />
+                 <FaSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 text-xs" />
+                 <input type="text" placeholder="식품 검색" value={search} onChange={(e) => setSearch(e.target.value)} className="w-full p-3 pl-10 bg-black border border-zinc-800 rounded-xl font-bold outline-none focus:border-lime-500 transition-all text-xs md:text-sm" />
                </div>
-               <button onClick={() => setAddFoodModal(true)} className="bg-zinc-800 hover:bg-lime-500 px-4 rounded-2xl font-black text-[10px] uppercase transition-all whitespace-nowrap">+ Custom</button>
+               <button onClick={() => setAddFoodModal(true)} className="bg-zinc-800 hover:bg-lime-500 px-3 rounded-xl font-black text-[10px] uppercase transition-all whitespace-nowrap">+ Custom</button>
              </div>
 
-             {/* [핵심] DB 리스트만 따로 스크롤 (overflow-y-auto) */}
-             <div className="flex-1 overflow-y-auto space-y-3 pr-2 custom-scrollbar">
+             <div className="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
                {[...userFoods, ...FOOD_DB].filter(f => f.name.includes(search)).map(food => (
-                 <div key={food.id} className="bg-zinc-800/80 p-5 rounded-3xl border border-zinc-800 group transition-all hover:border-zinc-700">
+                 <div key={food.id} className="bg-zinc-800/80 p-3 md:p-4 rounded-2xl border border-zinc-800 group transition-all hover:border-zinc-700">
                    <div className="flex justify-between items-start mb-1">
-                     <p className="text-lg font-black group-hover:text-lime-500 transition-colors">{food.name}</p>
-                     <span className="text-[10px] font-black text-zinc-600 uppercase">{food.cat}</span>
+                     <p className="text-sm md:text-base font-black group-hover:text-lime-500 transition-colors truncate">{food.name}</p>
+                     <span className="text-[10px] font-black text-zinc-600 uppercase whitespace-nowrap ml-2">{food.cat}</span>
                    </div>
-                   <p className="text-xs font-bold text-zinc-500 italic mb-4">{food.base}{food.unit} 당 {food.cal}kcal</p>
-                   <div className="grid grid-cols-4 gap-2">
+                   <p className="text-[10px] font-bold text-zinc-500 italic mb-2">{food.base}{food.unit} / {food.cal}kcal</p>
+                   <div className="grid grid-cols-4 gap-1">
                      {["breakfast", "lunch", "dinner", "snack"].map(m => (
-                       <button key={m} onClick={() => { setTargetMeal(m); setSelectedFood(food); setAmount(food.base); setModalOpen(true); }} className="text-[10px] font-black py-3 bg-zinc-950 rounded-xl hover:bg-white hover:text-black transition-all">{MEAL_KO[m]}</button>
+                       <button key={m} onClick={() => { setTargetMeal(m); setSelectedFood(food); setAmount(food.base); setModalOpen(true); }} className="text-[9px] font-black py-2 bg-zinc-950 rounded-lg hover:bg-white hover:text-black transition-all">{MEAL_KO[m]}</button>
                      ))}
                    </div>
                  </div>
@@ -181,15 +168,14 @@ export default function DietLog() {
           </div>
         </div>
 
-        {/* [섹션 2] 기록 대시보드: 남은 영역을 채우고 내용 많으면 스크롤 */}
-        <div className="w-full xl:w-2/3 flex flex-col gap-6 p-4 md:p-8 overflow-y-auto custom-scrollbar pb-20">
+        <div className="flex-1 w-full xl:w-2/3 flex flex-col gap-6 p-4 md:p-8 overflow-y-auto custom-scrollbar pb-20 bg-zinc-950">
           <div className="flex items-center justify-between bg-zinc-900 p-4 rounded-[2.5rem] border border-zinc-800 shadow-lg shrink-0">
              <button onClick={() => setDate(d => new Date(new Date(d).setDate(new Date(d).getDate()-1)).toISOString().split("T")[0])} className="p-4 bg-black rounded-full hover:bg-zinc-800 transition-colors"><FaChevronLeft className="text-zinc-500"/></button>
-             <h2 className="text-2xl font-black tracking-tighter italic">{date}</h2>
+             <h2 className="text-xl md:text-2xl font-black tracking-tighter italic">{date}</h2>
              <button onClick={() => setDate(d => new Date(new Date(d).setDate(new Date(d).getDate()+1)).toISOString().split("T")[0])} className="p-4 bg-black rounded-full hover:bg-zinc-800 transition-colors"><FaChevronRight className="text-zinc-500"/></button>
           </div>
 
-          <div className="bg-zinc-900 p-8 rounded-[3.5rem] border border-zinc-800 grid grid-cols-2 md:grid-cols-4 gap-8 shadow-xl shrink-0">
+          <div className="bg-zinc-900 p-6 md:p-8 rounded-[3.5rem] border border-zinc-800 grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8 shadow-xl shrink-0">
             <ProgressBar label="KCAL" current={total.cal} target={target.cal} color="bg-lime-500" unit="kcal" />
             <ProgressBar label="PROT" current={total.p} target={target.p} color="bg-blue-500" unit="g" />
             <ProgressBar label="CARB" current={total.c} target={target.c} color="bg-orange-500" unit="g" />
@@ -198,19 +184,19 @@ export default function DietLog() {
 
           <div className="grid md:grid-cols-2 gap-6">
             {Object.keys(myDiet).map(type => (
-              <div key={type} className="bg-zinc-900/30 p-6 rounded-[2.5rem] border border-zinc-800 flex flex-col min-h-[200px]">
+              <div key={type} className="bg-zinc-900/30 p-6 rounded-[2.5rem] border border-zinc-800 flex flex-col min-h-[150px]">
                 <h3 className="font-black text-xs text-zinc-500 uppercase tracking-[0.3em] mb-4">{MEAL_KO[type]}</h3> 
                 <div className="space-y-2">
                   {myDiet[type].length > 0 ? myDiet[type].map((f: any) => (
                     <div key={f.uuid} className="flex justify-between items-center bg-black/60 p-4 rounded-2xl border border-zinc-800 transition-all hover:border-zinc-700 group">
-                      <div>
-                        <p className="text-sm font-black text-zinc-100">{f.food_name} <span className="text-lime-500 text-[10px]">({f.amount}{f.unit})</span></p>
+                      <div className="overflow-hidden">
+                        <p className="text-sm font-black text-zinc-100 truncate">{f.food_name} <span className="text-lime-500 text-[10px]">({f.amount}{f.unit})</span></p>
                         <p className="text-[10px] font-bold text-zinc-600 italic">C{f.c} P{f.p} F{f.f} — {f.cal}kcal</p>
                       </div>
-                      <button onClick={() => removeFood(f.uuid)} className="text-zinc-800 group-hover:text-red-500 transition-colors p-2"><FaTrash size={14}/></button>
+                      <button onClick={() => removeFood(f.uuid)} className="text-zinc-800 group-hover:text-red-500 transition-colors p-2 shrink-0"><FaTrash size={14}/></button>
                     </div>
                   )) : (
-                    <p className="text-zinc-700 text-xs italic text-center py-4">기록 없음</p>
+                    <p className="text-zinc-700 text-xs italic text-center py-4 opacity-50">기록 없음</p>
                   )}
                 </div>
               </div>
@@ -219,11 +205,10 @@ export default function DietLog() {
         </div>
       </main>
 
-      {/* 모달: 커스텀 음식 등록 */}
       {addFoodModal && (
         <div className="fixed inset-0 bg-black/95 z-[400] flex items-center justify-center p-6 backdrop-blur-xl">
-          <div className="bg-zinc-900 p-10 rounded-[3rem] w-full max-w-lg border border-zinc-800 shadow-2xl">
-            <h3 className="text-2xl font-black mb-8 text-lime-500 italic uppercase">New Custom Item</h3>
+          <div className="bg-zinc-900 p-8 rounded-[2.5rem] w-full max-w-md border border-zinc-800 shadow-2xl overflow-y-auto max-h-[90vh]">
+            <h3 className="text-xl font-black mb-6 text-lime-500 italic uppercase">New Custom Item</h3>
             <div className="space-y-4">
               <Input label="음식명" val={newFoodForm.name} set={(v: any) => setNewFoodForm({...newFoodForm, name: v})} />
               <div className="grid grid-cols-2 gap-4">
@@ -237,22 +222,21 @@ export default function DietLog() {
               </div>
               <div className="bg-black/50 p-6 rounded-2xl border border-zinc-800 text-center">
                 <p className="text-[10px] font-black text-zinc-500 uppercase mb-1">Estimated Calories</p>
-                <p className="text-4xl font-black text-lime-500 italic">{newFoodForm.cal} <span className="text-sm text-zinc-600 non-italic">kcal</span></p>
+                <p className="text-3xl font-black text-lime-500 italic">{newFoodForm.cal} <span className="text-sm text-zinc-600 non-italic">kcal</span></p>
               </div>
-              <button onClick={handleSaveUserFood} className="w-full py-5 bg-lime-500 text-black font-black text-lg rounded-2xl mt-4 shadow-lg shadow-lime-500/20">등록하기</button>
-              <button onClick={() => setAddFoodModal(false)} className="w-full py-2 text-zinc-700 font-bold uppercase text-[10px] mt-2">Close</button>
+              <button onClick={handleSaveUserFood} className="w-full py-4 bg-lime-500 text-black font-black text-lg rounded-2xl mt-2 shadow-lg shadow-lime-500/20">등록하기</button>
+              <button onClick={() => setAddFoodModal(false)} className="w-full py-3 text-zinc-700 font-bold uppercase text-[10px]">Close</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* 모달: 양 조절 모달 */}
       {modalOpen && selectedFood && (
         <div className="fixed inset-0 bg-black/90 z-[300] flex items-center justify-center p-6 backdrop-blur-md">
           <div className="bg-zinc-900 p-10 rounded-[3rem] w-full max-w-sm border border-zinc-800 shadow-2xl">
-            <h2 className="text-2xl font-black mb-8 text-center uppercase italic text-lime-500">{selectedFood.name}</h2>
+            <h2 className="text-2xl font-black mb-8 text-center uppercase italic text-lime-500 break-keep">{selectedFood.name}</h2>
             <div className="flex items-center gap-4 mb-10">
-              <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} className="w-full p-6 bg-black border-2 border-zinc-800 rounded-[2rem] font-black text-4xl text-center outline-none focus:border-lime-500 transition-colors" autoFocus />
+              <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} className="w-full p-6 bg-black border-2 border-zinc-800 rounded-[2rem] font-black text-4xl text-center outline-none focus:border-lime-500 transition-colors text-white" autoFocus />
               <span className="text-xl font-black text-zinc-500 uppercase">{selectedFood.unit}</span>
             </div>
             <button onClick={confirmAdd} className="w-full py-6 bg-lime-500 text-black font-black text-xl rounded-[2rem] hover:scale-95 transition-transform">기록하기</button>

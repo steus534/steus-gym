@@ -34,6 +34,7 @@ export default function CommunityPage() {
     }
 
     // 3. 게시글 가져오기 (RLS 정책에 의해 일반 유저는 삭제된 글 자동 필터링됨)
+    // 관리자는 RLS 정책상 삭제된 글도 볼 수 있어야 함 (DB Policy 확인 필요)
     const { data, error } = await supabase
       .from('posts')
       .select('*')
@@ -98,12 +99,13 @@ export default function CommunityPage() {
   };
 
   return (
-    <div className="flex min-h-screen bg-zinc-950 text-white font-sans">
+    <div className="flex min-h-screen bg-zinc-950 text-white font-sans overflow-hidden">
       <Sidebar />
       <main className="flex-1 p-4 md:p-8 overflow-y-auto h-screen custom-scrollbar">
         <div className="max-w-5xl mx-auto space-y-8 pb-20">
           
-          <div className="flex justify-between items-end border-b border-zinc-800 pb-6">
+          {/* [수정 포인트] 모바일 상단 여백 추가 (버튼 가림 방지) */}
+          <div className="mt-14 md:mt-0 flex justify-between items-end border-b border-zinc-800 pb-6">
             <div>
               <h1 className="text-4xl font-black italic text-lime-500 uppercase tracking-tighter">Community</h1>
               <p className="text-zinc-500 font-bold mt-2">운동인들의 소통 공간 (Admin Mode: {isAdmin ? "ON" : "OFF"})</p>
@@ -118,19 +120,22 @@ export default function CommunityPage() {
                 const isDeleted = post.is_deleted; // 삭제 여부
                 const isMyPost = currentUserId === post.user_id; // 내 글인지 확인
 
+                // 일반 유저인데 삭제된 글이면 아예 안 보여줌 (DB단 필터링이 늦을 경우 대비)
+                if (isDeleted && !isAdmin) return null;
+
                 return (
                   <div 
                     key={post.id} 
                     className={`relative p-6 rounded-3xl border transition-all group ${
                       isDeleted 
-                        ? "bg-red-950/20 border-red-900/50 hover:border-red-500" // 삭제된 글 스타일
+                        ? "bg-red-950/10 border-red-900/50 hover:border-red-500" // 삭제된 글 스타일
                         : "bg-zinc-900 border-zinc-800 hover:border-lime-500/50" // 일반 글 스타일
                     }`}
                   >
                     <div className="flex justify-between items-start">
                       <div className="space-y-2 flex-1">
                         <div className="flex items-center gap-3">
-                          {/* 삭제 배지 */}
+                          {/* 삭제 배지 (관리자에게만 보임) */}
                           {isDeleted && (
                             <span className="bg-red-600 text-white text-[10px] font-black px-2 py-1 rounded-md uppercase flex items-center gap-1 shadow-lg shadow-red-600/20">
                               <FaTrash size={8} /> DELETED
@@ -142,7 +147,7 @@ export default function CommunityPage() {
                         </div>
                         
                         <p className="text-sm text-zinc-400 font-bold line-clamp-2">
-                          {isDeleted ? "(관리자에 의해 숨김 처리된 게시물입니다)" : post.content}
+                          {isDeleted ? "(관리자 권한으로 보는 삭제된 게시물입니다)" : post.content}
                         </p>
                         
                         <div className="flex items-center gap-4 text-xs text-zinc-500 font-bold mt-4">
@@ -152,9 +157,9 @@ export default function CommunityPage() {
                       </div>
 
                       {/* 버튼 컨트롤 영역 */}
-                      <div className="flex flex-col gap-2 ml-4">
+                      <div className="flex flex-col gap-2 ml-4 items-end">
                         
-                        {/* 1. 관리자일 때: 복구 및 영구 삭제 버튼 노출 */}
+                        {/* 1. 관리자이고 삭제된 글일 때: 복구 및 영구 삭제 버튼 노출 */}
                         {isAdmin && isDeleted && (
                           <div className="flex gap-2">
                             <button 
@@ -167,7 +172,7 @@ export default function CommunityPage() {
                               onClick={() => hardDelete(post.id)} 
                               className="px-3 py-2 bg-red-600/20 text-red-400 text-[10px] font-black rounded-lg hover:bg-red-600 hover:text-white transition-all border border-red-600/30 flex items-center gap-1"
                             >
-                              <FaBurn size={10}/> 영구 삭제
+                              <FaBurn size={10}/> 영구삭제
                             </button>
                           </div>
                         )}
@@ -176,7 +181,7 @@ export default function CommunityPage() {
                         {(isMyPost || isAdmin) && !isDeleted && (
                           <button 
                             onClick={() => softDelete(post.id)} 
-                            className="p-2 text-zinc-600 hover:text-red-500 transition-colors self-end"
+                            className="p-2 text-zinc-600 hover:text-red-500 transition-colors"
                             title="삭제하기"
                           >
                             <FaTrash />

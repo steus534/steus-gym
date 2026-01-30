@@ -19,19 +19,12 @@ const RPES = ["10", "9.5", "9", "8.5", "8", "7.5", "7", "6.5"];
 const REPS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
 export default function RpePage() {
-  // Unit State
   const [unit, setUnit] = useState<"kg" | "lbs">("kg");
-
-  // Top Set States
   const [weight, setWeight] = useState<number | string>("");
   const [reps, setReps] = useState<number>(1);
   const [rpe, setRpe] = useState<string>("8");
-  
-  // Backoff Set States
   const [backoffReps, setBackoffReps] = useState<number>(5);
   const [backoffRpe, setBackoffRpe] = useState<string>("8");
-
-  // Results
   const [e1rm, setE1rm] = useState<number>(0);
   const [backoffWeight, setBackoffWeight] = useState<number>(0);
 
@@ -53,14 +46,13 @@ export default function RpePage() {
   const toggleUnit = () => {
     const newUnit = unit === "kg" ? "lbs" : "kg";
     setUnit(newUnit);
-    // 선택 사항: 단위 변경 시 기존 입력값 변환 (1kg = 2.20462lbs)
     if (weight) {
       const converted = newUnit === "lbs" 
         ? Number(weight) * 2.20462 
         : Number(weight) / 2.20462;
       setWeight(Math.round(converted * 10) / 10);
     }
-    if (e1rm > 0) calculate(); // 결과값 갱신
+    if (e1rm > 0) calculate();
   };
 
   return (
@@ -68,14 +60,15 @@ export default function RpePage() {
       <Sidebar />
       <main className="flex-1 p-4 md:p-8 overflow-y-auto h-screen custom-scrollbar">
         <div className="max-w-5xl mx-auto space-y-8 pb-20">
-          <div className="flex justify-between items-center">
-            <h1 className="text-3xl font-black italic uppercase flex items-center gap-3">
+          
+          {/* [수정 포인트] 모바일 상단 여백 추가 */}
+          <div className="mt-14 md:mt-0 flex justify-between items-center">
+            <h1 className="text-2xl md:text-3xl font-black italic uppercase flex items-center gap-3">
               <FaTable className="text-lime-500" /> RPE CALCULATOR
             </h1>
-            {/* 단위 토글 스위치 */}
             <button 
               onClick={toggleUnit}
-              className="flex items-center gap-2 bg-zinc-900 border border-zinc-800 px-5 py-2.5 rounded-2xl hover:bg-lime-500 hover:text-black transition-all group shadow-lg"
+              className="flex items-center gap-2 bg-zinc-900 border border-zinc-800 px-4 md:px-5 py-2.5 rounded-2xl hover:bg-lime-500 hover:text-black transition-all group shadow-lg"
             >
               <FaExchangeAlt className="group-hover:rotate-180 transition-transform duration-500" />
               <span className="font-black text-xs uppercase tracking-widest">{unit} Mode</span>
@@ -188,18 +181,6 @@ export default function RpePage() {
           </div>
         </div>
       </main>
-    </div>
-  );
-}
-
-function LogProgress({ label, cur, target, color }: any) {
-  const p = Math.min(100, (cur/target)*100);
-  return (
-    <div className="space-y-1">
-      <div className="flex justify-between text-[9px] font-black uppercase"><span className="text-zinc-600">{label}</span><span>{cur}/{target}</span></div>
-      <div className="h-1 bg-black rounded-full overflow-hidden border border-zinc-800">
-        <div className={`h-full transition-all duration-500 ${color}`} style={{ width: `${p}%` }} />
-      </div>
     </div>
   );
 }

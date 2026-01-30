@@ -33,12 +33,15 @@ export default function CardioPage() {
   return (
     <div className="flex min-h-screen bg-zinc-950 text-white font-sans">
       <Sidebar />
-      <main className="flex-1 p-4 md:p-8 overflow-y-auto h-screen">
-        <div className="max-w-5xl mx-auto space-y-8">
+      <main className="flex-1 p-4 md:p-8 overflow-y-auto h-screen custom-scrollbar">
+        <div className="max-w-5xl mx-auto space-y-8 pb-20">
           
-          <h1 className="text-3xl font-black italic uppercase flex items-center gap-3">
-            <FaHeartbeat className="text-red-500" /> 유산소 가이드 (Cardio Zones)
-          </h1>
+          {/* [수정 포인트] 모바일 상단 여백(mt-14) 추가하여 버튼 가림 해결 */}
+          <div className="mt-14 md:mt-0">
+            <h1 className="text-3xl font-black italic uppercase flex items-center gap-3">
+              <FaHeartbeat className="text-red-500" /> 유산소 가이드 (Cardio Zones)
+            </h1>
+          </div>
 
           {/* 상단 정보 */}
           <div className="bg-zinc-900 p-8 rounded-[2.5rem] border border-zinc-800 shadow-xl flex flex-col md:flex-row gap-8 items-center">

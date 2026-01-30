@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import Sidebar from "../components/Sidebar";
+import Sidebar from "../components/Sidebar"; // 경로 주의 (폴더 구조에 맞게 수정)
 import { FaBook, FaDumbbell, FaRunning, FaFistRaised, FaMedal, FaBolt } from "react-icons/fa";
 
 type ProgramData = {
@@ -164,17 +164,18 @@ export default function ProgramsPage() {
   return (
     <div className="flex min-h-screen bg-zinc-950 text-white font-sans">
       <Sidebar />
-      <main className="flex-1 p-4 md:p-8 overflow-y-auto h-screen">
-        <div className="max-w-6xl mx-auto space-y-8">
+      <main className="flex-1 p-4 md:p-8 overflow-y-auto h-screen custom-scrollbar">
+        <div className="max-w-6xl mx-auto space-y-8 pb-20">
           
-          <div className="space-y-4">
+          {/* [수정 포인트] 모바일 상단 여백(mt-14) 추가 */}
+          <div className="space-y-4 mt-14 md:mt-0">
             <h1 className="text-3xl font-black italic uppercase flex items-center gap-3">
               <FaBook className="text-lime-500" /> 프로그램 가이드
             </h1>
             <p className="text-zinc-400">자신의 목표와 수준에 맞는 최적의 프로그램을 선택하세요.</p>
           </div>
 
-          {/* 카테고리 탭 (5개) */}
+          {/* 카테고리 탭 */}
           <div className="flex flex-wrap gap-4">
             <TabButton label="초급자" icon={<FaDumbbell />} id="beginner" current={category} set={setCategory} />
             <TabButton label="보디빌딩" icon={<FaRunning />} id="bodybuilding" current={category} set={setCategory} />

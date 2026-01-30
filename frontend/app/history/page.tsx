@@ -27,11 +27,9 @@ export default function HistoryPage() {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
         setUser(session.user);
-        // 프로필 정보 가져오기
         const { data: profile } = await supabase.from('profiles').select('weight, gender').eq('id', session.user.id).single();
         if (profile) setUserProfile({ weight: profile.weight || 80, gender: profile.gender || "male" });
         
-        // 로그 기록 가져오기
         const { data: history } = await supabase.from('growth_logs').select('*').eq('user_id', session.user.id).order('date', { ascending: true });
         if (history) setLogs(history);
       }
@@ -40,7 +38,6 @@ export default function HistoryPage() {
     init();
   }, []);
 
-  // [유틸] 주간 시작일(월요일) 구하기
   const getStartOfWeek = (dateString: string) => {
     const date = new Date(dateString);
     const day = date.getDay();
@@ -49,30 +46,23 @@ export default function HistoryPage() {
     return monday.toISOString().split('T')[0];
   };
 
-  // [로직] PL 포인트 계산 (Dots, IPF, Wilks)
   const calculatePoints = (total: number, bw: number, gender: string) => {
     const isMale = gender === "male";
     if (total <= 0 || bw <= 0) return { dots: 0, ipf: 0, wilks: 0 };
     
-    // DOTS
     const c = isMale ? [-0.000001093, 0.0007391293, -0.191875104, 24.0900756, -307.75076] : [-0.0000010706, 0.0005158568, -0.1126655495, 13.6175032, -57.96288];
     const dots = (total * 500) / (c[0]*Math.pow(bw,4) + c[1]*Math.pow(bw,3) + c[2]*Math.pow(bw,2) + c[3]*bw + c[4]);
     
-    // IPF GL Points
     const ipf = 100 * total / ((isMale ? 1199.72839 : 610.32796) - (isMale ? 1025.18162 : 1045.59282) * Math.exp(-(isMale ? 0.00921 : 0.03048) * bw));
     
-    // Wilks
     const wC = isMale ? [-216.0475144, 16.2606339, -0.002388645, -0.00113732, 7.01863E-06, -1.291E-08] : [594.31747775582, -27.23842536447, 0.82112226871, -0.00930733913, 4.731582E-05, -9.054E-08];
     const wilks = total * (500 / (wC[0] + wC[1]*bw + wC[2]*Math.pow(bw,2) + wC[3]*Math.pow(bw,3) + wC[4]*Math.pow(bw,4) + wC[5]*Math.pow(bw,5)));
     
     return { dots: Math.round(dots*100)/100, ipf: Math.round(ipf*100)/100, wilks: Math.round(wilks*100)/100 };
   };
 
-  // [데이터 가공] 차트용 데이터 생성
   const chartData = useMemo(() => {
     const weeklyMap: any = {};
-    
-    // 1. 기간 필터링
     let filteredLogs = [...logs];
     if (timeRange !== "ALL") {
       const cutoff = new Date();
@@ -81,8 +71,6 @@ export default function HistoryPage() {
       else if (timeRange === "1Y") cutoff.setFullYear(cutoff.getFullYear() - 1);
       filteredLogs = filteredLogs.filter(l => new Date(l.date) >= cutoff);
     }
-
-    // 2. 주간 최고 기록 그룹화
     filteredLogs.forEach(log => {
       const weekStart = getStartOfWeek(log.date);
       if (!weeklyMap[weekStart]) {
@@ -92,19 +80,10 @@ export default function HistoryPage() {
         weeklyMap[weekStart][log.exercise] = log.onerm;
       }
     });
-
-    // 3. 포맷 변환 및 포인트 계산
     return Object.values(weeklyMap).map((d: any) => {
       const total = (d.Squat || 0) + (d.Bench || 0) + (d.Deadlift || 0);
       const pts = calculatePoints(total, userProfile.weight, userProfile.gender);
-      return { 
-        ...d, 
-        "스쿼트": d.Squat || null, 
-        "벤치프레스": d.Bench || null, 
-        "데드리프트": d.Deadlift || null, 
-        "오버헤드프레스": d.OHP || null, 
-        ...pts 
-      };
+      return { ...d, "스쿼트": d.Squat || null, "벤치프레스": d.Bench || null, "데드리프트": d.Deadlift || null, "오버헤드프레스": d.OHP || null, ...pts };
     }).sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
   }, [logs, timeRange, userProfile]);
 
@@ -138,17 +117,11 @@ export default function HistoryPage() {
   return (
     <div className="flex h-screen bg-zinc-950 text-white font-sans overflow-hidden">
       <Sidebar />
-      
-      {/* [레이아웃 수정 핵심] 
-         1. 모바일/태블릿: flex-col (세로 배치), overflow-y-auto (전체 스크롤)
-         2. 데스크탑(xl): flex-row (가로 배치), overflow-hidden (각자 내부 스크롤)
-      */}
       <main className="flex-1 flex flex-col xl:flex-row h-screen overflow-y-auto xl:overflow-hidden custom-scrollbar">
         
-        {/* [섹션 1: 차트 영역] */}
-        {/* min-w-0: 태블릿에서 차트 찌그러짐 방지 */}
         <div className="flex-1 min-w-0 p-4 md:p-8 space-y-8 xl:overflow-y-auto custom-scrollbar">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          {/* [수정 포인트] mt-14 추가하여 모바일에서 버튼 공간 확보 */}
+          <div className="mt-14 md:mt-0 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <h1 className="text-3xl font-black italic text-lime-500 uppercase tracking-tighter">Growth History</h1>
             <div className="flex bg-zinc-900 p-1 rounded-xl gap-1 text-[10px] font-black shrink-0">
               {["3M", "6M", "1Y", "ALL"].map(r => (
@@ -157,7 +130,6 @@ export default function HistoryPage() {
             </div>
           </div>
 
-          {/* 주간 1RM 차트 */}
           <div className="bg-zinc-900/50 p-6 rounded-[2.5rem] border border-zinc-800 shadow-xl">
             <h2 className="text-xs font-black text-zinc-500 uppercase flex items-center gap-2 mb-6"><FaDumbbell className="text-lime-500"/> Weekly Best 1RM (kg)</h2>
             <div className="h-[350px] w-full min-h-0">
@@ -177,7 +149,6 @@ export default function HistoryPage() {
             </div>
           </div>
 
-          {/* 주간 포인트 차트 */}
           <div className="bg-zinc-900/50 p-6 rounded-[2.5rem] border border-zinc-800 shadow-xl">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
               <h2 className="text-xs font-black text-zinc-500 uppercase flex items-center gap-2"><FaTrophy className="text-purple-500"/> Powerlifting Points</h2>
@@ -201,18 +172,21 @@ export default function HistoryPage() {
           </div>
         </div>
 
-        {/* [섹션 2: 입력 및 로그 영역] */}
-        {/* 데스크탑에서는 고정폭(400px) & 독립 스크롤 / 모바일에서는 하단에 배치됨 */}
         <div className="w-full xl:w-[400px] flex-shrink-0 bg-zinc-900/50 border-t xl:border-t-0 xl:border-l border-zinc-800 p-6 md:p-8 flex flex-col gap-8 xl:h-full xl:overflow-y-auto custom-scrollbar">
           
-          {/* 입력 폼 */}
           <div className="bg-zinc-900 p-6 rounded-[2rem] border border-zinc-800 shadow-xl">
             <h3 className="font-black mb-6 flex items-center gap-2 text-sm uppercase tracking-wider text-white"><FaSave className="text-lime-500"/> Record PR</h3>
             <div className="space-y-4">
-              <div className="relative">
+              <div className="relative min-w-0">
                 <FaCalendarAlt className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-600 text-xs" />
-                <input type="date" value={form.date} onChange={e => setForm({...form, date: e.target.value})} className="w-full bg-black border border-zinc-800 rounded-xl p-3 pl-10 text-xs font-bold outline-none text-white focus:border-lime-500 transition-colors" />
+                <input 
+                  type="date" 
+                  value={form.date} 
+                  onChange={e => setForm({...form, date: e.target.value})} 
+                  className="w-full bg-black border border-zinc-800 rounded-xl p-3 pl-10 text-xs font-bold outline-none text-white focus:border-lime-500 transition-colors min-w-0" 
+                />
               </div>
+
               <div className="grid grid-cols-2 gap-2">
                 {["Squat", "Bench", "Deadlift", "OHP"].map(ex => (
                   <button key={ex} onClick={() => setForm({...form, exercise: ex})} className={`py-3 rounded-xl font-black text-[10px] uppercase transition-all ${form.exercise === ex ? 'bg-white text-black' : 'bg-black text-zinc-500 border border-zinc-800'}`}>{EX_KO[ex]}</button>
@@ -232,7 +206,6 @@ export default function HistoryPage() {
             </div>
           </div>
 
-          {/* 로그 리스트 */}
           <div className="flex-1 space-y-3">
             <p className="text-[10px] font-black text-zinc-600 uppercase tracking-widest px-2">Recent Logs</p>
             {[...logs].reverse().map(log => (

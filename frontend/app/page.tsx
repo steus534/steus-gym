@@ -4,7 +4,7 @@ import Sidebar from "./components/Sidebar";
 import { supabase } from "@/lib/supabase";
 import { FaBolt, FaSun, FaMoon, FaMars, FaVenus, FaDrumstickBite, FaExchangeAlt, FaUtensils, FaSlidersH, FaSave } from "react-icons/fa";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend } from "recharts";
-import { useRouter } from "next/navigation"; // 페이지 이동용
+import { useRouter } from "next/navigation";
 
 export default function Home() {
   const [user, setUser] = useState<any>(null);
@@ -25,13 +25,10 @@ export default function Home() {
   const [result, setResult] = useState<any>(null);
   const [converter, setConverter] = useState({ kg: "", lbs: "" });
 
-  // [계산 로직] 입력값이 바뀔 때마다 실시간으로 작동 (useEffect에서 호출됨)
   const getCalculatedData = useCallback((targetKcal: number) => {
     const w = Number(form.weight) || 0;
-    const proteinG = Math.round(w * protMult); // 체중 x 단백질배수
+    const proteinG = Math.round(w * protMult);
     const proteinCal = proteinG * 4;
-    
-    // 남은 칼로리를 탄수화물/지방 비율로 나눔
     const remainingCal = Math.max(0, targetKcal - proteinCal);
     const carbCal = remainingCal * (carbRatio / 100);
     const fatCal = remainingCal * ((100 - carbRatio) / 100);
@@ -47,7 +44,6 @@ export default function Home() {
     };
   }, [form.weight, form.activity, form.split, protMult, carbRatio]);
 
-  // [초기화] DB에서 내 정보 불러오기
   useEffect(() => {
     const initData = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -79,7 +75,6 @@ export default function Home() {
     initData();
   }, []);
 
-  // [자동 계산] 폼 변경 시 자동 실행
   useEffect(() => {
     if (!isLoaded) return;
     
@@ -102,25 +97,22 @@ export default function Home() {
     setResult(getCalculatedData(targetKcal));
   }, [form, gender, unit, isLoaded, getCalculatedData]);
 
-  // [핵심 수정] DB 저장 및 식단 연동
   const handleSave = async () => {
     if (!user) return alert("로그인이 필요합니다! (게스트는 저장 불가)");
     if (!result) return;
 
-    // 차트 데이터에서 탄/단/지 그램(g) 수 추출
     const carbG = result.macros_chart[0].value;
     const protG = result.macros_chart[1].value;
     const fatG = result.macros_chart[2].value;
 
     const { error } = await supabase.from('profiles').upsert({
       id: user.id,
-      ...form, // 키, 몸무게, 활동량 등 입력값 저장
+      ...form, 
       gender, 
       unit, 
       prot_mult: protMult, 
       carb_ratio: carbRatio,
       
-      // [중요] 계산된 목표치를 DB에 저장해야 식단 페이지랑 연동됨
       target_cal: result.kcal,
       target_carb: carbG,
       target_prot: protG,
@@ -131,10 +123,9 @@ export default function Home() {
 
     if (error) {
       console.error(error);
-      alert("저장 실패 ㅠㅠ");
+      alert("저장 실패");
     } else {
       localStorage.setItem("gymRatData", JSON.stringify({ form, gender, unit, protMult, carbRatio }));
-      
       if(confirm("저장 완료! 🔥\n식단 기록 페이지로 이동해서 확인해볼까요?")) {
         router.push("/diet/log");
       }
@@ -159,8 +150,9 @@ export default function Home() {
       <Sidebar />
       <main className="flex-1 p-4 md:p-8 overflow-y-auto h-screen custom-scrollbar">
         <div className="max-w-7xl mx-auto space-y-8 pb-20">
-          {/* 상단바 */}
-          <div className="flex justify-between items-center bg-white dark:bg-zinc-900 p-6 rounded-3xl shadow-lg border border-zinc-200 dark:border-zinc-800">
+          
+          {/* [수정됨] mt-14 md:mt-0 추가하여 모바일에서 버튼 공간 확보 */}
+          <div className="mt-14 md:mt-0 flex justify-between items-center bg-white dark:bg-zinc-900 p-6 rounded-3xl shadow-lg border border-zinc-200 dark:border-zinc-800">
              <div className="flex flex-col">
                <h1 className="text-3xl font-black italic tracking-tighter uppercase text-zinc-900 dark:text-zinc-100">DASHBOARD</h1>
                {user && <span className="text-[10px] font-bold text-lime-500">{user.email} 로그인 중</span>}
@@ -177,7 +169,7 @@ export default function Home() {
                     <ToggleArea label="성별" icon={gender === "male" ? <FaMars /> : <FaVenus />} val={gender === "male" ? "남성" : "여성"} on={gender === "female"} set={() => setGender(gender === "male" ? "female" : "male")} />
                 </div>
                 
-                <div className="grid grid-cols-3 gap-6">
+                <div className="grid grid-cols-3 gap-3 md:gap-6">
                   <BigInput label="키" val={form.height} set={(v:any) => setForm({...form, height: v})} unit={unit === "metric" ? "cm" : "ft"} />
                   <BigInput label="체중" val={form.weight} set={(v:any) => setForm({...form, weight: v})} unit={unit === "metric" ? "kg" : "lbs"} />
                   <BigInput label="나이" val={form.age} set={(v:any) => setForm({...form, age: v})} unit="세" />
@@ -192,25 +184,29 @@ export default function Home() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-6">
+                <div className="grid grid-cols-2 gap-3 md:gap-6">
                   <BigSelect label="운동 분할" val={form.split} set={(v:any) => setForm({...form, split: v})} options={[{v:"1",t:"무분할 (주2-3회)"},{v:"2",t:"2분할 (주4회)"},{v:"3",t:"3분할 (주6회)"},{v:"5",t:"5분할 (매일)"}]} />
                   <BigSelect label="생활 패턴" val={form.activity} set={(v:any) => setForm({...form, activity: v})} options={[{v:"sedentary",t:"백수/집콕"},{v:"student",t:"학생/사무직"},{v:"active",t:"서비스직"},{v:"labor",t:"현장직"}]} />
                 </div>
 
-                <div className="grid grid-cols-2 gap-6">
+                <div className="grid grid-cols-2 gap-3 md:gap-6">
                   <BigSelect label="목표 설정" val={form.goal} set={(v:any) => setForm({...form, goal: v})} options={[{v:"bulk",t:"벌크업"},{v:"cut",t:"커팅"},{v:"diet",t:"다이어트"},{v:"lean",t:"린매스업"}]} />
-                  <div className="bg-lime-500/10 dark:bg-black/40 p-4 rounded-2xl border border-lime-500/30 flex items-center justify-between">
-                    <div className="flex items-center gap-3"><FaDrumstickBite className="text-lime-500 text-xl" /><label className="text-sm font-black text-zinc-600 dark:text-zinc-400 uppercase">단백질</label></div>
-                    <div className="flex items-center gap-2">
-                        <input type="number" step="0.1" value={protMult} onChange={(e) => setProtMult(Number(e.target.value))} className="w-16 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 p-2 rounded-xl font-black text-center text-lg outline-none text-zinc-900 dark:text-white" /><span className="font-bold text-zinc-500 text-xs">배</span>
+                  
+                  <div className="bg-lime-500/10 dark:bg-black/40 px-2 py-3 md:p-4 rounded-2xl border border-lime-500/30 flex items-center justify-between">
+                    <div className="flex items-center gap-1 md:gap-3 shrink-0">
+                      <FaDrumstickBite className="text-lime-500 text-sm md:text-xl" />
+                      <label className="text-[10px] md:text-sm font-black text-zinc-600 dark:text-zinc-400 uppercase">단백질</label>
+                    </div>
+                    <div className="flex items-center gap-1">
+                        <input type="number" step="0.1" value={protMult} onChange={(e) => setProtMult(Number(e.target.value))} className="w-12 md:w-16 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 p-1 md:p-2 rounded-xl font-black text-center text-sm md:text-lg outline-none text-zinc-900 dark:text-white" />
+                        <span className="font-bold text-zinc-500 text-[10px] md:text-xs shrink-0">배</span>
                     </div>
                   </div>
                 </div>
                 
-                {/* [수정됨] 계산 버튼 -> 동기화 저장 버튼 */}
                 <button 
                   onClick={handleSave} 
-                  className="w-full py-5 bg-lime-500 text-black font-black text-2xl rounded-2xl shadow-lg shadow-lime-500/20 active:scale-95 transition-all flex items-center justify-center gap-3 hover:bg-lime-400"
+                  className="w-full py-4 md:py-5 bg-lime-500 text-black font-black text-xl md:text-2xl rounded-2xl shadow-lg shadow-lime-500/20 active:scale-95 transition-all flex items-center justify-center gap-3 hover:bg-lime-400"
                 >
                   <FaSave /> 데이터 저장
                 </button>
@@ -266,7 +262,7 @@ export default function Home() {
   );
 }
 
-// 하단 보조 컴포넌트들 (기존 유지)
+// 하단 컴포넌트들 (기존과 동일하게 유지)
 function ToggleArea({ label, icon, val, on, set }: any) { 
   return ( 
     <div className="flex items-center gap-3 bg-zinc-50 dark:bg-zinc-950 px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-800">
@@ -277,11 +273,11 @@ function ToggleArea({ label, icon, val, on, set }: any) {
 }
 function BigInput({ label, val, set, unit }: any) { 
   return ( 
-    <div className="flex flex-col gap-2">
-      <label className="text-sm font-black text-zinc-500 uppercase">{label}</label>
+    <div className="flex flex-col gap-1 md:gap-2">
+      <label className="text-[10px] md:text-sm font-black text-zinc-500 uppercase">{label}</label>
       <div className="relative">
-        <input type="number" value={val} onChange={(e) => set(+e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-900 border-2 border-zinc-800 p-4 rounded-2xl font-black text-xl pr-12 text-zinc-900 dark:text-white outline-none focus:border-lime-500" />
-        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-black text-zinc-500">{unit}</span>
+        <input type="number" value={val} onChange={(e) => set(+e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-900 border-2 border-zinc-800 rounded-2xl font-black outline-none focus:border-lime-500 text-zinc-900 dark:text-white p-2 text-base pr-7 md:p-4 md:text-xl md:pr-12" />
+        <span className="absolute top-1/2 -translate-y-1/2 font-black text-zinc-500 uppercase right-2 text-[10px] md:right-4 md:text-sm">{unit}</span>
       </div>
     </div> 
   ); 
@@ -289,21 +285,21 @@ function BigInput({ label, val, set, unit }: any) {
 function RowInput({ label, val, set, unit }: any) { 
   return ( 
     <div className="flex items-center justify-between bg-white dark:bg-zinc-900 p-3 rounded-2xl border border-zinc-800">
-      <label className="text-lg font-black text-zinc-600 dark:text-zinc-200">{label}</label>
-      <div className="relative w-32">
-        <input type="number" value={val} onChange={(e) => set(+e.target.value)} className="w-full bg-zinc-50 dark:bg-black border border-zinc-800 p-2 rounded-xl font-black text-right pr-10 text-lg text-zinc-900 dark:text-white outline-none focus:border-lime-500" />
-        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-zinc-500">{unit}</span>
+      <label className="text-sm md:text-lg font-black text-zinc-600 dark:text-zinc-200">{label}</label>
+      <div className="relative w-24 md:w-32">
+        <input type="number" value={val} onChange={(e) => set(+e.target.value)} className="w-full bg-zinc-50 dark:bg-black border border-zinc-800 p-2 rounded-xl font-black text-right pr-8 md:pr-10 text-base md:text-lg text-zinc-900 dark:text-white outline-none focus:border-lime-500" />
+        <span className="absolute right-2 md:right-3 top-1/2 -translate-y-1/2 text-[9px] md:text-[10px] font-bold text-zinc-500">{unit}</span>
       </div>
     </div> 
   ); 
 }
 function BigSelect({ label, val, set, options }: any) { 
   return ( 
-    <div className="flex flex-col gap-2">
-      <label className="text-sm font-black text-zinc-500 uppercase">{label}</label>
-      <select value={val} onChange={(e) => set(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-900 border-2 border-zinc-800 p-4 rounded-2xl font-black text-zinc-900 dark:text-white outline-none hover:border-lime-500 appearance-none">
+    <div className="flex flex-col gap-1 md:gap-2">
+      <label className="text-[10px] md:text-sm font-black text-zinc-500 uppercase">{label}</label>
+      <select value={val} onChange={(e) => set(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-900 border-2 border-zinc-800 p-3 md:p-4 rounded-2xl font-black text-zinc-900 dark:text-white outline-none hover:border-lime-500 appearance-none text-xs md:text-base">
         {options.map((o: any) => (<option key={o.v} value={o.v}>{o.t}</option>))}
       </select>
     </div> 
   ); 
-} 
+}

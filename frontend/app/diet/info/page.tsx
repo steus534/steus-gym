@@ -58,7 +58,11 @@ export default function NutrientInfo() {
       <Sidebar />
       <main className="flex-1 p-8 overflow-y-auto h-screen custom-scrollbar">
         <div className="max-w-4xl mx-auto space-y-12 pb-20">
-          <h1 className="text-4xl font-black italic text-lime-500 uppercase tracking-tighter">Nutrient Guide</h1>
+          
+          {/* [수정 포인트] 모바일 상단 여백 추가 (버튼 가림 방지) */}
+          <div className="mt-14 md:mt-0">
+            <h1 className="text-4xl font-black italic text-lime-500 uppercase tracking-tighter">Nutrient Guide</h1>
+          </div>
 
           {/* 1. 3대 영양소 (Macros) */}
           <section className="grid md:grid-cols-3 gap-6">
