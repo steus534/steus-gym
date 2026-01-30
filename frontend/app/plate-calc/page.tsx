@@ -1,53 +1,78 @@
 "use client";
 import { useState, useEffect } from "react";
 import Sidebar from "../components/Sidebar";
-import { FaCircleNotch, FaDumbbell, FaCog } from "react-icons/fa";
+import { FaCircleNotch, FaDumbbell, FaCog, FaExchangeAlt } from "react-icons/fa";
 
-// 전체 원판 데이터베이스 (순서: 무거운 순)
-const ALL_PLATES = [
-  { w: 25, color: "bg-red-600", h: "h-32" },
-  { w: 20, color: "bg-blue-600", h: "h-32" },
-  { w: 15, color: "bg-yellow-500", h: "h-28" },
-  { w: 10, color: "bg-green-600", h: "h-24" },
-  { w: 5, color: "bg-white", h: "h-20" },
-  { w: 2.5, color: "bg-black border border-white", h: "h-16" },
-  { w: 2, color: "bg-blue-400", h: "h-14" },
-  { w: 1.5, color: "bg-yellow-400", h: "h-12" },
-  { w: 1.25, color: "bg-zinc-400", h: "h-11" },
-  { w: 1, color: "bg-green-400", h: "h-10" },
-  { w: 0.5, color: "bg-gray-200", h: "h-8" },
-];
+// 단위별 원판 데이터베이스
+const PLATES_DATA = {
+  kg: [
+    { w: 25, color: "bg-red-600", h: "h-32" },
+    { w: 20, color: "bg-blue-600", h: "h-32" },
+    { w: 15, color: "bg-yellow-500", h: "h-28" },
+    { w: 10, color: "bg-green-600", h: "h-24" },
+    { w: 5, color: "bg-white", h: "h-20" },
+    { w: 2.5, color: "bg-black border border-white", h: "h-16" },
+    { w: 2, color: "bg-blue-400", h: "h-14" },     // 다시 추가
+    { w: 1.5, color: "bg-yellow-400", h: "h-12" },  // 다시 추가
+    { w: 1.25, color: "bg-zinc-400", h: "h-11" },
+    { w: 1, color: "bg-green-400", h: "h-10" },    // 다시 추가
+    { w: 0.5, color: "bg-gray-200", h: "h-8" },    // 다시 추가
+  ],
+  lbs: [
+    // LBS는 북미 표준 규격에 따라 45, 35, 25, 10, 5, 2.5가 기본임
+    { w: 45, color: "bg-zinc-800 border-2 border-red-600", h: "h-32" },
+    { w: 35, color: "bg-blue-600", h: "h-30" },
+    { w: 25, color: "bg-yellow-500", h: "h-28" },
+    { w: 10, color: "bg-green-600", h: "h-24" },
+    { w: 5, color: "bg-white", h: "h-20" },
+    { w: 2.5, color: "bg-black", h: "h-16" },
+  ]
+};
+
+const BAR_OPTIONS = {
+  kg: [{ n: "탄력봉", w: 20 }, { n: "여성용", w: 15 }, { n: "EZ-바", w: 18 }, { n: "머신", w: 0 }],
+  lbs: [{ n: "Standard", w: 45 }, { n: "Women's", w: 35 }, { n: "EZ-Bar", w: 40 }, { n: "Machine", w: 0 }]
+};
 
 export default function PlateCalcPage() {
+  const [unit, setUnit] = useState<"kg" | "lbs">("kg");
   const [targetWeight, setTargetWeight] = useState<string>("");
   const [barWeight, setBarWeight] = useState<number>(20);
   const [collarWeight, setCollarWeight] = useState<number>(0);
   const [result, setResult] = useState<any[]>([]);
   const [inventory, setInventory] = useState<number[]>([20, 15, 10, 5, 2.5]);
 
-  const togglePlate = (weight: number) => {
-    if (inventory.includes(weight)) {
-      setInventory(inventory.filter((w) => w !== weight));
-    } else {
-      setInventory([...inventory, weight]);
+  // 단위 변경 핸들러
+  const toggleUnit = () => {
+    const newUnit = unit === "kg" ? "lbs" : "kg";
+    setUnit(newUnit);
+    // 입력값 변환 (1kg = 2.20462lbs)
+    if (targetWeight) {
+      const converted = newUnit === "lbs" ? Number(targetWeight) * 2.20462 : Number(targetWeight) / 2.20462;
+      setTargetWeight(Math.round(converted).toString());
     }
+    // 바 무게 기본값 변경
+    setBarWeight(newUnit === "kg" ? 20 : 45);
+    // 인벤토리 초기화 (단위에 맞는 원판으로)
+    setInventory(newUnit === "kg" ? [25, 20, 15, 10, 5, 2.5] : [45, 35, 25, 10, 5, 2.5]);
   };
 
-  // [핵심] 입력값이 변할 때마다 자동 계산 (useEffect)
+  const togglePlate = (weight: number) => {
+    setInventory(prev => prev.includes(weight) ? prev.filter(w => w !== weight) : [...prev, weight]);
+  };
+
   useEffect(() => {
     const target = Number(targetWeight);
-    const minWeight = barWeight + collarWeight;
+    const minWeight = barWeight + (collarWeight * 2); // 마구리는 양쪽 합산
 
-    // 유효성 검사 실패 시 결과 초기화
-    if (!target || (minWeight > 0 && target < minWeight)) {
+    if (!target || target < minWeight) {
       setResult([]);
       return;
     }
 
     let remain = (target - minWeight) / 2;
     const platesNeeded = [];
-
-    const usablePlates = ALL_PLATES.filter((p) => inventory.includes(p.w)).sort((a, b) => b.w - a.w);
+    const usablePlates = [...PLATES_DATA[unit]].filter(p => inventory.includes(p.w)).sort((a, b) => b.w - a.w);
 
     for (const p of usablePlates) {
       while (remain >= p.w) {
@@ -56,157 +81,102 @@ export default function PlateCalcPage() {
       }
     }
     setResult(platesNeeded);
-
-  }, [targetWeight, barWeight, collarWeight, inventory]); // 이 값들이 변하면 즉시 실행됨
+  }, [targetWeight, barWeight, collarWeight, inventory, unit]);
 
   return (
     <div className="flex min-h-screen bg-zinc-950 text-white font-sans">
       <Sidebar />
-      <main className="flex-1 p-4 md:p-8 overflow-y-auto h-screen">
-        <div className="max-w-5xl mx-auto space-y-8">
-          <h1 className="text-3xl font-black italic uppercase flex items-center gap-3">
-            <FaCircleNotch className="text-lime-500" /> 원판 계산기
-          </h1>
+      <main className="flex-1 p-4 md:p-8 overflow-y-auto h-screen custom-scrollbar">
+        <div className="max-w-5xl mx-auto space-y-8 pb-20">
+          <div className="flex justify-between items-center">
+            <h1 className="text-3xl font-black italic uppercase flex items-center gap-3">
+              <FaCircleNotch className="text-lime-500" /> Plate Calculator
+            </h1>
+            <button onClick={toggleUnit} className="flex items-center gap-2 bg-zinc-900 border border-zinc-800 px-6 py-3 rounded-2xl hover:bg-lime-500 hover:text-black transition-all group font-black text-xs uppercase italic">
+              <FaExchangeAlt className="group-hover:rotate-180 transition-transform duration-500" /> {unit} Mode
+            </button>
+          </div>
 
           <div className="bg-zinc-900 p-8 rounded-[2.5rem] border border-zinc-800 shadow-xl space-y-8">
-            
-            {/* 원판 설정 섹션 */}
+            {/* 인벤토리 설정 */}
             <div className="bg-black/30 p-6 rounded-3xl border border-zinc-800">
-              <h3 className="text-sm font-black text-zinc-400 mb-4 flex items-center gap-2 uppercase">
-                <FaCog /> 체육관 보유 원판 설정 (Click to Toggle)
+              <h3 className="text-[10px] font-black text-zinc-500 mb-4 flex items-center gap-2 uppercase tracking-widest">
+                <FaCog /> Available Plates ({unit})
               </h3>
               <div className="flex flex-wrap gap-2">
-                {ALL_PLATES.map((p) => {
-                  const isActive = inventory.includes(p.w);
-                  return (
-                    <button
-                      key={p.w}
-                      onClick={() => togglePlate(p.w)}
-                      className={`px-3 py-2 rounded-xl text-sm font-bold transition-all border-2 ${
-                        isActive
-                          ? "bg-lime-500 border-lime-500 text-black shadow-[0_0_10px_rgba(132,204,22,0.3)]"
-                          : "bg-zinc-900 border-zinc-700 text-zinc-500 hover:border-zinc-500"
-                      }`}
-                    >
-                      {p.w} kg
-                    </button>
-                  );
-                })}
+                {PLATES_DATA[unit].map((p) => (
+                  <button key={p.w} onClick={() => togglePlate(p.w)} className={`px-4 py-2 rounded-xl text-xs font-black transition-all border-2 ${inventory.includes(p.w) ? "bg-lime-500 border-lime-500 text-black shadow-lg" : "bg-zinc-900 border-zinc-700 text-zinc-500"}`}>
+                    {p.w} {unit}
+                  </button>
+                ))}
               </div>
             </div>
 
-            {/* 입력 섹션 (버튼 제거됨) */}
-            <div className="flex flex-wrap gap-4 items-end">
-              <div className="flex-1 min-w-[200px] space-y-2">
-                <label className="text-sm font-bold text-zinc-400">목표 중량 (Total Weight)</label>
-                <input
-                  type="number"
-                  value={targetWeight}
-                  onChange={(e) => setTargetWeight(e.target.value)}
-                  placeholder="예: 100"
-                  className="w-full p-4 bg-black border border-zinc-700 rounded-2xl font-black text-2xl text-white outline-none focus:border-lime-500 transition-colors"
-                  autoFocus
-                />
+            {/* 입력 섹션 */}
+            <div className="grid md:grid-cols-3 gap-6">
+              <div className="space-y-2">
+                <label className="text-xs font-black text-zinc-500 uppercase ml-2">Total Weight ({unit})</label>
+                <input type="number" value={targetWeight} onChange={(e) => setTargetWeight(e.target.value)} placeholder={`Target ${unit}`} className="w-full p-5 bg-black border border-zinc-700 rounded-2xl font-black text-3xl text-white outline-none focus:border-lime-500 transition-all shadow-inner" />
               </div>
-              
-              <div className="w-40 space-y-2">
-                <label className="text-sm font-bold text-zinc-400">기구 무게</label>
-                <select value={barWeight} onChange={(e) => setBarWeight(Number(e.target.value))} className="w-full p-4 bg-black border border-zinc-700 rounded-2xl font-bold text-white outline-none focus:border-lime-500 cursor-pointer">
-                  <option value={20}>탄력봉 (20kg)</option>
-                  <option value={18}>EZ-컬 바 (18kg)</option>
-                  <option value={15}>여성용 (15kg)</option>
-                  <option value={0}>머신/맨몸 (0kg)</option>
+              <div className="space-y-2">
+                <label className="text-xs font-black text-zinc-500 uppercase ml-2">Bar Weight</label>
+                <select value={barWeight} onChange={(e) => setBarWeight(Number(e.target.value))} className="w-full p-5 bg-black border border-zinc-700 rounded-2xl font-black text-xl text-white outline-none focus:border-lime-500 cursor-pointer appearance-none">
+                  {BAR_OPTIONS[unit].map(opt => <option key={opt.w} value={opt.w}>{opt.n} ({opt.w}{unit})</option>)}
                 </select>
               </div>
-              <div className="w-40 space-y-2">
-                <label className="text-sm font-bold text-zinc-400">마구리 (Collars)</label>
-                <select value={collarWeight} onChange={(e) => setCollarWeight(Number(e.target.value))} className="w-full p-4 bg-black border border-zinc-700 rounded-2xl font-bold text-white outline-none focus:border-lime-500 cursor-pointer">
-                  <option value={0}>기본/스프링 (0kg)</option>
-                  <option value={5}>시합용 (5kg)</option>
+              <div className="space-y-2">
+                <label className="text-xs font-black text-zinc-500 uppercase ml-2">Collar Weight (Each)</label>
+                <select value={collarWeight} onChange={(e) => setCollarWeight(Number(e.target.value))} className="w-full p-5 bg-black border border-zinc-700 rounded-2xl font-black text-xl text-white outline-none focus:border-lime-500 cursor-pointer appearance-none">
+                  <option value={0}>None</option>
+                  <option value={unit === 'kg' ? 2.5 : 5}>{unit === 'kg' ? '2.5kg' : '5lb'} (Comp)</option>
                 </select>
               </div>
             </div>
 
-            {/* 결과 시각화 섹션 */}
-            <div className="bg-zinc-800 p-8 rounded-[2.5rem] border-2 border-zinc-700 flex flex-col items-center justify-center min-h-[300px] relative overflow-hidden transition-all">
+            {/* 시각화 */}
+            <div className="bg-zinc-800 p-10 rounded-[3rem] border-2 border-zinc-700 flex flex-col items-center justify-center min-h-[300px] shadow-2xl">
               {result.length > 0 ? (
-                <div className="flex items-center w-full justify-center animate-in fade-in zoom-in duration-300">
-                  
-                  {/* 1. 바벨 슬리브 (안쪽) */}
-                  <div className="w-8 h-8 bg-zinc-400 rounded-l-md shadow-inner border-r border-zinc-500 z-20"></div>
-                  
-                  {/* 2. 슬리브 몸통 & 원판 */}
-                  <div className="w-auto min-w-[120px] h-6 bg-zinc-300 border-y-4 border-zinc-400 flex items-center justify-start px-1 rounded-r-md z-10 relative">
+                <div className="flex items-center justify-center animate-in zoom-in duration-300">
+                  <div className="w-10 h-10 bg-zinc-400 rounded-l-md border-r border-zinc-500 z-20 shadow-lg"></div>
+                  <div className="min-w-[140px] h-8 bg-zinc-300 border-y-4 border-zinc-400 flex items-center justify-start px-2 rounded-r-md z-10 relative shadow-inner">
                     <div className="flex items-center gap-[2px]">
-                      
-                      {/* [A] 안쪽 원판 */}
-                      {result
-                        .filter(p => collarWeight > 0 ? p.w >= 2.5 : true)
-                        .map((p, idx) => (
-                          <div key={`inner-${idx}`} className={`w-6 ${p.h} ${p.color} rounded-md shadow-lg border-l border-black/20 flex items-center justify-center relative group`}>
-                            <span className="text-[10px] font-black text-white drop-shadow-md -rotate-90 absolute whitespace-nowrap">{p.w}</span>
-                            <div className="absolute -top-10 bg-black text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-30 border border-zinc-700">{p.w} kg</div>
-                          </div>
+                      {result.map((p, idx) => (
+                        <div key={idx} className={`w-7 ${p.h} ${p.color} rounded-md shadow-2xl border-l border-black/30 flex items-center justify-center relative group`}>
+                          <span className="text-[10px] font-black text-white -rotate-90 absolute drop-shadow-md">{p.w}</span>
+                          <div className="absolute -top-12 bg-black text-white text-[10px] font-black px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50 border border-zinc-700 shadow-2xl">{p.w} {unit}</div>
+                        </div>
                       ))}
-
-                      {/* [B] 시합용 마구리 */}
                       {collarWeight > 0 && (
-                        <div className="w-4 h-10 bg-gradient-to-r from-zinc-200 to-zinc-400 rounded-sm border border-zinc-500 shadow-xl flex items-center justify-center relative group z-20">
-                           <div className="w-6 h-1 bg-black absolute rotate-90 opacity-30"></div>
-                           <div className="absolute -top-10 bg-black text-lime-500 text-xs font-bold px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-30 border border-zinc-700">2.5kg</div>
+                        <div className="w-5 h-12 bg-zinc-100 rounded-sm border border-zinc-400 shadow-xl flex items-center justify-center relative z-20">
+                          <div className="w-1 h-12 bg-zinc-400 absolute rotate-90 opacity-20"></div>
                         </div>
                       )}
-
-                      {/* [C] 바깥쪽 원판 */}
-                      {collarWeight > 0 && result
-                        .filter(p => p.w < 2.5)
-                        .map((p, idx) => (
-                          <div key={`outer-${idx}`} className={`w-6 ${p.h} ${p.color} rounded-md shadow-lg border-l border-black/20 flex items-center justify-center relative group`}>
-                            <span className="text-[10px] font-black text-white drop-shadow-md -rotate-90 absolute whitespace-nowrap">{p.w}</span>
-                            <div className="absolute -top-10 bg-black text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-30 border border-zinc-700">{p.w} kg</div>
-                          </div>
-                      ))}
-
                     </div>
                   </div>
-
-                  {/* 3. 바벨 손잡이 */}
-                  {barWeight > 0 && (
-                    <div className="w-48 h-4 bg-zinc-500 rounded-r-full -ml-2 z-0 relative"></div>
-                  )}
+                  <div className="w-56 h-6 bg-zinc-500 rounded-r-full -ml-2 z-0 shadow-lg border-y-2 border-zinc-600"></div>
                 </div>
               ) : (
-                <div className="text-zinc-600 font-bold flex flex-col items-center gap-4">
-                  <FaDumbbell className="text-6xl opacity-20" />
-                  <span>중량을 입력하면 원판 조합을 보여줍니다.</span>
+                <div className="text-zinc-600 font-black uppercase italic tracking-widest flex flex-col items-center gap-4 opacity-30">
+                  <FaDumbbell className="text-8xl" />
+                  <span>Enter Weight to Calculate</span>
                 </div>
               )}
             </div>
 
-            {/* 텍스트 결과 */}
+            {/* 하단 요약 */}
             {result.length > 0 && (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="bg-black p-4 rounded-2xl border border-zinc-800">
-                  <p className="text-xs text-zinc-500 font-bold uppercase">한 쪽 무게</p>
-                  <p className="text-2xl font-black text-white">
-                    {(Number(targetWeight) - barWeight - collarWeight) / 2} <span className="text-sm text-zinc-500">kg</span>
-                  </p>
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="bg-black p-6 rounded-[2rem] border border-zinc-800 flex justify-between items-center">
+                  <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Weight Per Side</span>
+                  <span className="text-3xl font-black italic">{(Number(targetWeight) - barWeight - (collarWeight * 2)) / 2} <span className="text-sm text-lime-500 non-italic">{unit}</span></span>
                 </div>
-                
-                {collarWeight > 0 && (
-                   <div className="bg-zinc-800 p-4 rounded-2xl border border-zinc-700 flex flex-col justify-center items-center">
-                     <p className="text-xs text-zinc-400 font-bold uppercase mb-1">마구리 포함</p>
-                     <p className="text-lg font-black text-lime-500">+ 5 kg</p>
-                   </div>
-                )}
-
-                <div className="col-span-2 md:col-span-3 flex flex-wrap gap-2">
-                  {Object.entries(result.reduce((acc, curr) => ({ ...acc, [curr.w]: (acc[curr.w] || 0) + 1 }), {}))
+                <div className="bg-zinc-800/50 p-6 rounded-[2rem] border border-zinc-800 flex flex-wrap gap-2 items-center">
+                   {Object.entries(result.reduce((acc, curr) => ({ ...acc, [curr.w]: (acc[curr.w] || 0) + 1 }), {}))
                     .sort((a: any, b: any) => b[0] - a[0])
                     .map(([w, count]: any) => (
-                      <div key={w} className="bg-zinc-700 px-4 py-2 rounded-xl flex items-center gap-2 border border-zinc-600">
-                        <span className="font-black text-white">{w}kg</span>
-                        <span className="text-lime-400 font-bold">x {count}</span>
+                      <div key={w} className="bg-zinc-900 px-4 py-2 rounded-xl border border-zinc-700 flex items-center gap-3">
+                        <span className="font-black text-white text-sm">{w}{unit}</span>
+                        <span className="text-lime-500 font-black italic underline decoration-zinc-700 underline-offset-4 text-lg">x {count}</span>
                       </div>
                     ))}
                 </div>
