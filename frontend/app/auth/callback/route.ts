@@ -1,39 +1,50 @@
-import { createServerClient, type CookieOptions } from '@supabase/ssr'
-import { cookies } from 'next/headers'
-import { NextResponse } from 'next/server'
+import { NextResponse } from 'next/server';
+import { createServerClient } from '@supabase/ssr'; // 또는 사용 중인 utils 경로
+import { cookies } from 'next/headers';
 
 export async function GET(request: Request) {
-  const { searchParams, origin } = new URL(request.url)
-  const code = searchParams.get('code')
-  const next = searchParams.get('next') ?? '/'
-
+  // 1. 요청된 URL에서 'origin'(도메인)과 'code'(인증코드)를 추출
+  const requestUrl = new URL(request.url);
+  const code = requestUrl.searchParams.get('code');
+  
+  // [핵심] origin은 'http://localhost:3000' 또는 'https://니사이트.vercel.app'이 됨
+  const origin = requestUrl.origin;
+  
+  // 2. 인증 코드가 있으면 세션으로 교환
   if (code) {
-    const cookieStore = await cookies() // Next.js 15버전 기준 (만약 에러나면 await 제거)
+    const cookieStore = await cookies(); // Next.js 15+에서는 await 필요, 14 이하면 그냥 cookies()
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       {
         cookies: {
-          get(name: string) {
-            return cookieStore.get(name)?.value
+          // 쿠키 처리 로직 (기존 utils/supabase/server.ts랑 비슷함)
+          getAll() {
+            return cookieStore.getAll();
           },
-          set(name: string, value: string, options: CookieOptions) {
-            cookieStore.set({ name, value, ...options })
-          },
-          remove(name: string, options: CookieOptions) {
-            cookieStore.delete({ name, ...options })
+          setAll(cookiesToSet) {
+            try {
+              cookiesToSet.forEach(({ name, value, options }) =>
+                cookieStore.set(name, value, options)
+              );
+            } catch {
+              // Server Component에서 쿠키 설정 불가 에러 무시
+            }
           },
         },
       }
-    )
+    );
     
-    const { error } = await supabase.auth.exchangeCodeForSession(code)
+    // 코드 교환
+    const { error } = await supabase.auth.exchangeCodeForSession(code);
     
     if (!error) {
-      return NextResponse.redirect(`${origin}${next}`)
+      // 3. [성공 시] 로컬이면 로컬로, 배포면 배포로 리다이렉트
+      // 뒤에 /community나 /dashboard 등 원하는 경로 붙여도 됨
+      return NextResponse.redirect(`${origin}/community`);
     }
   }
 
-  // 에러 나면 에러 페이지 대신 그냥 메인으로 보내서 404 방지
-  return NextResponse.redirect(`${origin}`)
+  // 4. [실패 시] 에러 페이지나 홈으로
+  return NextResponse.redirect(`${origin}/auth/auth-code-error`);
 }

@@ -2,8 +2,9 @@
 import { useState, useEffect, useCallback } from "react";
 import Sidebar from "./components/Sidebar";
 import { supabase } from "@/lib/supabase";
-import { FaBolt, FaSun, FaMoon, FaMars, FaVenus, FaDrumstickBite, FaExchangeAlt, FaUtensils, FaSlidersH } from "react-icons/fa";
+import { FaBolt, FaSun, FaMoon, FaMars, FaVenus, FaDrumstickBite, FaExchangeAlt, FaUtensils, FaSlidersH, FaSave } from "react-icons/fa";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend } from "recharts";
+import { useRouter } from "next/navigation"; // 페이지 이동용
 
 export default function Home() {
   const [user, setUser] = useState<any>(null);
@@ -11,6 +12,7 @@ export default function Home() {
   const [unit, setUnit] = useState("metric");
   const [gender, setGender] = useState("male");
   const [isLoaded, setIsLoaded] = useState(false);
+  const router = useRouter();
   
   const initialForm = { 
     height: 180, weight: 80, age: 23, 
@@ -23,11 +25,13 @@ export default function Home() {
   const [result, setResult] = useState<any>(null);
   const [converter, setConverter] = useState({ kg: "", lbs: "" });
 
-  // [개선] 계산 로직을 useCallback으로 감싸서 무한 루프 및 린트 에러 방지
+  // [계산 로직] 입력값이 바뀔 때마다 실시간으로 작동 (useEffect에서 호출됨)
   const getCalculatedData = useCallback((targetKcal: number) => {
     const w = Number(form.weight) || 0;
-    const proteinG = Math.round(w * protMult);
+    const proteinG = Math.round(w * protMult); // 체중 x 단백질배수
     const proteinCal = proteinG * 4;
+    
+    // 남은 칼로리를 탄수화물/지방 비율로 나눔
     const remainingCal = Math.max(0, targetKcal - proteinCal);
     const carbCal = remainingCal * (carbRatio / 100);
     const fatCal = remainingCal * ((100 - carbRatio) / 100);
@@ -39,10 +43,11 @@ export default function Home() {
         { name: "단백질", value: proteinG, fill: "#3b82f6", cal: proteinCal, ratio: targetKcal > 0 ? Math.round((proteinCal / targetKcal) * 100) : 0 },
         { name: "지방", value: Math.round(fatCal / 9), fill: "#ef4444", cal: Math.round(fatCal), ratio: targetKcal > 0 ? Math.round((fatCal / targetKcal) * 100) : 0 },
       ],
-      routine: [`생활 패턴 반영됨. 목표: ${targetKcal}kcal`]
+      routine: [`생활 패턴(${form.activity})과 운동 강도(${form.split}분할)가 반영된 결과입니다.`]
     };
-  }, [form.weight, protMult, carbRatio]);
+  }, [form.weight, form.activity, form.split, protMult, carbRatio]);
 
+  // [초기화] DB에서 내 정보 불러오기
   useEffect(() => {
     const initData = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -54,11 +59,12 @@ export default function Home() {
         if (data) {
           savedData = {
             form: { 
-              height: data.height, weight: data.weight, age: data.age, 
-              squat: data.squat, bench: data.bench, deadlift: data.deadlift, 
-              split: data.split, goal: data.goal, activity: data.activity 
+              height: data.height || 175, weight: data.weight || 75, age: data.age || 23, 
+              squat: data.squat || 0, bench: data.bench || 0, deadlift: data.deadlift || 0, 
+              split: data.split || "3", goal: data.goal || "muscle", activity: data.activity || "student" 
             },
-            gender: data.gender, unit: data.unit, protMult: data.prot_mult, carbRatio: data.carb_ratio
+            gender: data.gender || "male", unit: data.unit || "metric", 
+            protMult: data.prot_mult || 1.8, carbRatio: data.carb_ratio || 50
           };
         }
       }
@@ -73,6 +79,7 @@ export default function Home() {
     initData();
   }, []);
 
+  // [자동 계산] 폼 변경 시 자동 실행
   useEffect(() => {
     if (!isLoaded) return;
     
@@ -95,14 +102,43 @@ export default function Home() {
     setResult(getCalculatedData(targetKcal));
   }, [form, gender, unit, isLoaded, getCalculatedData]);
 
-  const handleCalculate = async () => {
-    if (user) {
-      await supabase.from('profiles').upsert({
-        id: user.id, ...form, gender, unit, prot_mult: protMult, carb_ratio: carbRatio, updated_at: new Date()
-      });
+  // [핵심 수정] DB 저장 및 식단 연동
+  const handleSave = async () => {
+    if (!user) return alert("로그인이 필요합니다! (게스트는 저장 불가)");
+    if (!result) return;
+
+    // 차트 데이터에서 탄/단/지 그램(g) 수 추출
+    const carbG = result.macros_chart[0].value;
+    const protG = result.macros_chart[1].value;
+    const fatG = result.macros_chart[2].value;
+
+    const { error } = await supabase.from('profiles').upsert({
+      id: user.id,
+      ...form, // 키, 몸무게, 활동량 등 입력값 저장
+      gender, 
+      unit, 
+      prot_mult: protMult, 
+      carb_ratio: carbRatio,
+      
+      // [중요] 계산된 목표치를 DB에 저장해야 식단 페이지랑 연동됨
+      target_cal: result.kcal,
+      target_carb: carbG,
+      target_prot: protG,
+      target_fat: fatG,
+      
+      updated_at: new Date()
+    });
+
+    if (error) {
+      console.error(error);
+      alert("저장 실패 ㅠㅠ");
+    } else {
+      localStorage.setItem("gymRatData", JSON.stringify({ form, gender, unit, protMult, carbRatio }));
+      
+      if(confirm("저장 완료! 🔥\n식단 기록 페이지로 이동해서 확인해볼까요?")) {
+        router.push("/diet/log");
+      }
     }
-    localStorage.setItem("gymRatData", JSON.stringify({ form, gender, unit, protMult, carbRatio }));
-    alert("저장 완료! 🔥");
   };
 
   const renderCustomLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, name, value, cal, ratio }: any) => {
@@ -116,13 +152,13 @@ export default function Home() {
     );
   };
 
-  if (!isLoaded) return <div className="min-h-screen bg-zinc-950 text-white flex items-center justify-center font-black">GYM RAT LOADING...</div>;
+  if (!isLoaded) return <div className="min-h-screen bg-zinc-950 text-white flex items-center justify-center font-black animate-pulse">GYM RAT LOADING...</div>;
 
   return (
     <div className={`${dark ? "dark bg-zinc-950 text-zinc-200" : "bg-zinc-100 text-zinc-900"} flex min-h-screen transition-colors font-sans`}>
       <Sidebar />
-      <main className="flex-1 p-4 md:p-8 overflow-y-auto h-screen">
-        <div className="max-w-7xl mx-auto space-y-8">
+      <main className="flex-1 p-4 md:p-8 overflow-y-auto h-screen custom-scrollbar">
+        <div className="max-w-7xl mx-auto space-y-8 pb-20">
           {/* 상단바 */}
           <div className="flex justify-between items-center bg-white dark:bg-zinc-900 p-6 rounded-3xl shadow-lg border border-zinc-200 dark:border-zinc-800">
              <div className="flex flex-col">
@@ -170,11 +206,18 @@ export default function Home() {
                     </div>
                   </div>
                 </div>
-                <button onClick={handleCalculate} className="w-full py-5 bg-lime-500 text-black font-black text-2xl rounded-2xl shadow-lg shadow-lime-500/20 active:scale-95 transition-all">분석 저장하기 🔥</button>
+                
+                {/* [수정됨] 계산 버튼 -> 동기화 저장 버튼 */}
+                <button 
+                  onClick={handleSave} 
+                  className="w-full py-5 bg-lime-500 text-black font-black text-2xl rounded-2xl shadow-lg shadow-lime-500/20 active:scale-95 transition-all flex items-center justify-center gap-3 hover:bg-lime-400"
+                >
+                  <FaSave /> 데이터 저장
+                </button>
               </div>
             </div>
 
-            {/* 오른쪽 결과창 */}
+            {/* 오른쪽 결과창 (실시간 변동) */}
             <div className="lg:col-span-1 space-y-6">
               <div className="bg-white dark:bg-zinc-900 p-8 rounded-[2.5rem] border border-zinc-200 dark:border-zinc-800 shadow-lg">
                 <h3 className="text-xl font-black uppercase mb-4 text-zinc-500 dark:text-zinc-400 flex items-center gap-2"><FaExchangeAlt className="text-lime-500"/> 단위 변환기</h3>
@@ -193,7 +236,7 @@ export default function Home() {
 
                   <div className="bg-black/40 p-4 rounded-2xl border border-zinc-800">
                     <div className="flex justify-between items-center mb-3">
-                      <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest"><FaSlidersH className="inline mr-1"/> 탄/지 비율</span>
+                      <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest"><FaSlidersH className="inline mr-1"/> 탄/지 비율 조정</span>
                       <span className="text-[10px] font-bold text-lime-500">탄 {carbRatio}% : 지 {100-carbRatio}%</span>
                     </div>
                     <input type="range" min="0" max="100" step="5" value={carbRatio} onChange={(e) => setCarbRatio(Number(e.target.value))} className="w-full h-1 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-lime-500" />
@@ -223,7 +266,7 @@ export default function Home() {
   );
 }
 
-// 하단 보조 컴포넌트들
+// 하단 보조 컴포넌트들 (기존 유지)
 function ToggleArea({ label, icon, val, on, set }: any) { 
   return ( 
     <div className="flex items-center gap-3 bg-zinc-50 dark:bg-zinc-950 px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-800">
@@ -263,4 +306,4 @@ function BigSelect({ label, val, set, options }: any) {
       </select>
     </div> 
   ); 
-}
+} 

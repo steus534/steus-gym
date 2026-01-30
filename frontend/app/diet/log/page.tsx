@@ -8,7 +8,7 @@ import {
 
 const MEAL_KO: Record<string, string> = { breakfast: "아침", lunch: "점심", dinner: "저녁", snack: "간식" };
 
-// 기존 26개 식품 DB 전체 복구
+// 기존 26개 식품 DB 전체 (생략 없음)
 const FOOD_DB = [
   { id: 1, name: "햇반 (기본)", base: 210, unit: "g", cal: 315, c: 70, p: 5, f: 1, cat: "탄수" },
   { id: 2, name: "햇반 (작은공기)", base: 130, unit: "g", cal: 195, c: 43, p: 3, f: 0.5, cat: "탄수" },
@@ -38,7 +38,10 @@ const FOOD_DB = [
 
 export default function DietLog() {
   const [user, setUser] = useState<any>(null);
-  const [target] = useState({ cal: 2500, p: 160, c: 300, f: 70 });
+  
+  // [수정 포인트] 초기값 0으로 설정 (DB에서 가져오면 채워짐)
+  const [target, setTarget] = useState({ cal: 0, p: 0, c: 0, f: 0 });
+  
   const [myDiet, setMyDiet] = useState<Record<string, any[]>>({ breakfast: [], lunch: [], dinner: [], snack: [] });
   const [userFoods, setUserFoods] = useState<any[]>([]);
   const [userPresets, setUserPresets] = useState<any[]>([]);
@@ -65,13 +68,33 @@ export default function DietLog() {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
         setUser(session.user);
-        await fetchAssets(session.user.id);
-        await fetchDailyDiet(session.user.id, date);
+        await fetchUserData(session.user.id); // 목표치 가져오기
+        await fetchAssets(session.user.id);   // 커스텀 음식 가져오기
+        await fetchDailyDiet(session.user.id, date); // 식단 기록 가져오기
       }
       setIsLoaded(true);
     };
     init();
   }, [date]);
+
+  // [핵심 기능] DB에서 사용자 목표 칼로리 및 탄단지 가져오기
+  const fetchUserData = async (userId: string) => {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('target_cal, target_carb, target_prot, target_fat')
+      .eq('id', userId)
+      .single();
+
+    if (profile) {
+      // DB 값이 있으면 쓰고, 없으면 기본값(2500) 사용
+      setTarget({
+        cal: profile.target_cal || 2500,
+        c: profile.target_carb || 300,
+        p: profile.target_prot || 160,
+        f: profile.target_fat || 70
+      });
+    }
+  };
 
   const fetchAssets = async (userId: string) => {
     const { data } = await supabase.from('user_assets').select('*').eq('user_id', userId).single();
@@ -125,9 +148,9 @@ export default function DietLog() {
       <Sidebar />
       <main className="flex-1 p-4 md:p-8 overflow-y-auto h-screen flex flex-col xl:flex-row gap-8 custom-scrollbar">
         
-        {/* 왼쪽 섹션: 확장된 DB */}
+        {/* 왼쪽 섹션: DB 및 커스텀 음식 */}
         <div className="xl:w-1/3 flex flex-col gap-6">
-          <h1 className="text-4xl font-black italic text-lime-500 uppercase tracking-tighter">Full Diet DB</h1>
+          <h1 className="text-4xl font-black italic text-lime-500 uppercase tracking-tighter">Diet DB</h1>
           <div className="bg-zinc-900/50 p-6 rounded-[2.5rem] border border-zinc-800 flex-1 flex flex-col overflow-hidden">
              <div className="flex gap-3 mb-6">
                <div className="relative flex-1">
@@ -165,6 +188,7 @@ export default function DietLog() {
           </div>
 
           <div className="bg-zinc-900 p-8 rounded-[3.5rem] border border-zinc-800 grid grid-cols-2 md:grid-cols-4 gap-8 shadow-xl">
+            {/* 여기가 이제 DB에서 불러온 target 값으로 움직임 */}
             <ProgressBar label="KCAL" current={total.cal} target={target.cal} color="bg-lime-500" unit="kcal" />
             <ProgressBar label="PROT" current={total.p} target={target.p} color="bg-blue-500" unit="g" />
             <ProgressBar label="CARB" current={total.c} target={target.c} color="bg-orange-500" unit="g" />
@@ -192,7 +216,7 @@ export default function DietLog() {
         </div>
       </main>
 
-      {/* 모달: 커스텀 음식 자동 계산 등록 */}
+      {/* 모달: 커스텀 음식 등록 */}
       {addFoodModal && (
         <div className="fixed inset-0 bg-black/95 z-[400] flex items-center justify-center p-6 backdrop-blur-xl">
           <div className="bg-zinc-900 p-10 rounded-[3rem] w-full max-w-lg border border-zinc-800 shadow-2xl">
