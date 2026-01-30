@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
 import Sidebar from "../components/Sidebar";
 import Link from "next/link";
-import { FaPlus, FaSearch, FaThumbtack, FaEye, FaHeart, FaGhost, FaDumbbell } from "react-icons/fa";
+import { FaPlus, FaSearch, FaThumbtack, FaEye, FaHeart, FaGhost } from "react-icons/fa";
 
 const CATEGORIES = ["전체", "공지", "운동", "식단", "장비", "일반"];
 const DIFFICULTIES = ["전체", "초급자", "중급자", "고급자"];
@@ -25,11 +25,9 @@ export default function AdminListPage() {
   const processedPosts = useMemo(() => {
     let list = [...posts];
     list = list.filter(p => p.is_deleted === showDeleted);
-    // [교차 필터링] 기존 카테고리 + 난이도
     if (selectedCat !== "전체") list = list.filter(p => p.category === selectedCat);
     if (selectedDiff !== "전체") list = list.filter(p => p.difficulty === selectedDiff);
     if (search) list = list.filter(p => p.title.toLowerCase().includes(search.toLowerCase()));
-    
     list.sort((a, b) => (a.is_pinned === b.is_pinned ? 0 : a.is_pinned ? -1 : 1));
     return list;
   }, [posts, selectedCat, selectedDiff, search, showDeleted]);
@@ -49,20 +47,16 @@ export default function AdminListPage() {
             </div>
           </header>
 
-          <div className="bg-zinc-900/50 p-6 rounded-[2rem] border border-zinc-800 mb-12 space-y-4">
+          <div className="bg-zinc-900/50 p-6 rounded-[2rem] border border-zinc-800 mb-12 space-y-4 shadow-2xl">
             <div className="relative w-full">
               <FaSearch className="absolute left-5 top-1/2 -translate-y-1/2 text-zinc-600" />
               <input placeholder="검색..." value={search} onChange={e => setSearch(e.target.value)} className="w-full bg-black border border-zinc-800 rounded-xl p-3 pl-12 text-sm outline-none focus:border-lime-500 transition-all" />
             </div>
-            
-            {/* 기본 카테고리 바 */}
             <div className="flex gap-2 overflow-x-auto pb-1">
               {CATEGORIES.map(c => (
                 <button key={c} onClick={() => setSelectedCat(c)} className={`px-4 py-2 rounded-xl text-[10px] font-black whitespace-nowrap transition-all ${selectedCat === c ? "bg-lime-500 text-black" : "bg-black text-zinc-500 border border-zinc-800"}`}>{c}</button>
               ))}
             </div>
-
-            {/* 난이도 카테고리 바 */}
             <div className="flex gap-2 overflow-x-auto">
               <span className="text-[10px] font-black text-zinc-600 self-center mr-2 uppercase tracking-tighter">Difficulty :</span>
               {DIFFICULTIES.map(d => (
@@ -73,15 +67,21 @@ export default function AdminListPage() {
 
           <div className="space-y-3">
             {processedPosts.map(post => (
-              <Link key={post.id} href={`/admin/${post.id}`} className={`block bg-zinc-900/30 p-6 rounded-3xl border transition-all ${post.is_deleted ? 'border-red-500/30 bg-red-500/5' : post.is_pinned ? 'border-lime-500/30 bg-lime-500/5' : 'border-zinc-800/50 hover:border-zinc-600'}`}>
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center gap-3">
-                    {post.is_pinned && <FaThumbtack className="text-lime-500 rotate-45" />}
-                    <div className="flex gap-1.5">
-                      <span className="bg-zinc-800 px-2 py-0.5 rounded text-[8px] font-black text-zinc-500 uppercase">{post.category}</span>
-                      <span className="bg-zinc-900 border border-zinc-800 px-2 py-0.5 rounded text-[8px] font-black text-blue-400 uppercase">{post.difficulty}</span>
+              <Link key={post.id} href={`/admin/${post.id}`} className={`block bg-zinc-900/30 p-6 rounded-3xl border transition-all ${post.is_deleted ? 'border-red-500/30 bg-red-500/5' : post.is_pinned ? 'border-lime-500/30 bg-lime-500/5' : 'border-zinc-800/50 hover:border-zinc-600 shadow-lg'}`}>
+                <div className="flex justify-between items-start">
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center gap-3">
+                      {post.is_pinned && <FaThumbtack className="text-lime-500 rotate-45" />}
+                      <div className="flex gap-1.5">
+                        <span className="bg-zinc-800 px-2 py-0.5 rounded text-[8px] font-black text-zinc-500 uppercase">{post.category}</span>
+                        {post.difficulty && <span className="bg-zinc-900 border border-zinc-800 px-2 py-0.5 rounded text-[8px] font-black text-blue-400 uppercase">{post.difficulty}</span>}
+                      </div>
                     </div>
                     <h2 className="text-lg font-black text-zinc-300">{post.title}</h2>
+                    {/* 작성 시점 병기 */}
+                    <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-tighter">
+                      {new Date(post.created_at).toLocaleString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                    </p>
                   </div>
                   <div className="flex gap-6 text-[10px] text-zinc-600 font-black">
                     <span className="flex items-center gap-1.5"><FaEye/> {post.views || 0}</span>
