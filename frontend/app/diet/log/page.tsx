@@ -8,6 +8,7 @@ import {
 
 const MEAL_KO: Record<string, string> = { breakfast: "아침", lunch: "점심", dinner: "저녁", snack: "간식" };
 
+// FOOD_DB 기존 내용 유지 (생략)
 const FOOD_DB = [
   { id: 1, name: "햇반 (기본)", base: 210, unit: "g", cal: 315, c: 70, p: 5, f: 1, cat: "탄수" },
   { id: 2, name: "햇반 (작은공기)", base: 130, unit: "g", cal: 195, c: 43, p: 3, f: 0.5, cat: "탄수" },
@@ -136,8 +137,8 @@ export default function DietLog() {
       <Sidebar />
       <main className="flex-1 flex flex-col xl:flex-row overflow-hidden custom-scrollbar">
         
-        <div className="w-full xl:w-1/3 flex flex-col p-4 md:p-8 gap-6 shrink-0 h-[35vh] xl:h-auto border-b xl:border-b-0 border-zinc-800 xl:border-r">
-          {/* [수정 포인트] 모바일 여백 추가 */}
+        {/* [수정 포인트] 모바일에서 높이 45vh로 확대 + 최소 높이 350px 보장 */}
+        <div className="w-full xl:w-1/3 flex flex-col p-4 md:p-8 gap-6 shrink-0 h-[55vh] min-h-[350px] xl:h-auto xl:min-h-0 border-b xl:border-b-0 border-zinc-800 xl:border-r">
           <h1 className="mt-14 md:mt-0 text-3xl md:text-4xl font-black italic text-lime-500 uppercase tracking-tighter shrink-0">Diet DB</h1>
           
           <div className="bg-zinc-900/50 p-4 md:p-6 rounded-[2.5rem] border border-zinc-800 flex-1 flex flex-col overflow-hidden shadow-inner">
@@ -205,6 +206,7 @@ export default function DietLog() {
         </div>
       </main>
 
+      {/* 모달: 커스텀 음식 등록 (기존 유지) */}
       {addFoodModal && (
         <div className="fixed inset-0 bg-black/95 z-[400] flex items-center justify-center p-6 backdrop-blur-xl">
           <div className="bg-zinc-900 p-8 rounded-[2.5rem] w-full max-w-md border border-zinc-800 shadow-2xl overflow-y-auto max-h-[90vh]">
@@ -231,6 +233,7 @@ export default function DietLog() {
         </div>
       )}
 
+      {/* 모달: 양 조절 모달 (기존 유지) */}
       {modalOpen && selectedFood && (
         <div className="fixed inset-0 bg-black/90 z-[300] flex items-center justify-center p-6 backdrop-blur-md">
           <div className="bg-zinc-900 p-10 rounded-[3rem] w-full max-w-sm border border-zinc-800 shadow-2xl">
@@ -248,6 +251,7 @@ export default function DietLog() {
   );
 }
 
+// 하단 컴포넌트 유지...
 function ProgressBar({ label, current, target, color, unit }: any) {
   const pct = Math.min(100, (current / target) * 100);
   return ( 
