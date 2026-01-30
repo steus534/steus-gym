@@ -9,7 +9,7 @@ import {
 import AuthButton from "./AuthButton";
 
 const UPDATE_HISTORY = [
-  { date: "2026.01.30", title: "모바일 UI 대규모 개편", desc: "메인 대시보드, 식단, 그래프 페이지 모바일 최적화 완료. 아이폰 SE 대응." },
+  { date: "2026.01.30", title: "모바일 UI 대규모 개편", desc: "메인 대시보드, 식단, 그래프 페이지 모바일 최적화 완료." },
   { date: "2026.01.29", title: "관리자 기능 추가", desc: "커뮤니티 관리자 모드 (삭제된 글 복구/영구삭제) 기능 탑재." },
   { date: "2026.01.28", title: "RPE & 원판 계산기", desc: "1RM 기반 RPE 계산기 및 바벨 원판 조합 계산기 기능 추가." },
   { date: "2026.01.27", title: "성장 그래프 업데이트", desc: "3대 운동 1RM 추이 그래프 및 PL 포인트(Dots, Wilks) 자동 계산 적용." },
