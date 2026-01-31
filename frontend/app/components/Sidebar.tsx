@@ -30,7 +30,7 @@ function toFontSize(v: unknown): number {
 
 function formatDate(iso: string) {
   const d = new Date(iso);
-  return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}`;
 }
 
 export default function Sidebar() {
@@ -42,7 +42,8 @@ export default function Sidebar() {
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState({ title: "", desc: "", font_size: FONT_SIZE_DEFAULT });
+  const [form, setForm] = useState({ title: "", desc: "", font_size: 16 }); // 기본 본문 크기 16으로 변경
+  const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
 
   const fetchLogs = useCallback(async () => {
     const { data } = await supabase
@@ -77,18 +78,18 @@ export default function Sidebar() {
 
   const openAdd = () => {
     setEditingId(null);
-    setForm({ title: "", desc: "", font_size: FONT_SIZE_DEFAULT });
+    setForm({ title: "", desc: "", font_size: 16 }); // 기본 크기 16
     setShowAddForm(true);
   };
   const openEdit = (log: UpdateLogEntry) => {
     setShowAddForm(false);
     setEditingId(log.id);
-    setForm({ title: log.title, desc: log.desc, font_size: toFontSize(log.font_size) });
+    setForm({ title: log.title, desc: log.desc, font_size: toFontSize(log.font_size) || 16 });
   };
   const cancelForm = () => {
     setShowAddForm(false);
     setEditingId(null);
-    setForm({ title: "", desc: "", font_size: FONT_SIZE_DEFAULT });
+    setForm({ title: "", desc: "", font_size: 16 });
   };
 
   const submitAdd = async () => {
@@ -202,87 +203,29 @@ export default function Sidebar() {
   const renderFormattedText = (text: string) => {
     if (!text) return null;
 
-    // 1. 사이즈 태그 처리: [size:20]...[/size]
-    // 2. 볼드 처리: **...**
-    // 3. 이탤릭 처리: *...*
+    // 단계별로 태그를 변환하는 대신, 한 번에 정규식으로 쪼개서 처리
+    // 1. [size:XX]...[/size]
+    // 2. **...**
+    // 3. *...*
     
-    let parts: (string | JSX.Element)[] = [text];
+    const regex = /(\[size:\d+\].*?\[\/size\]|\*\*.*?\*\*|\*.*?\*)/g;
+    const parts = text.split(regex);
 
-    // 사이즈 처리
-    const sizeRegex = /\[size:(\d+)\](.*?)\[\/size\]/g;
-    let newParts: (string | JSX.Element)[] = [];
-    
-    parts.forEach(part => {
-      if (typeof part !== "string") {
-        newParts.push(part);
-        return;
-      }
-      
-      let lastIndex = 0;
-      let match;
-      while ((match = sizeRegex.exec(part)) !== null) {
-        if (match.index > lastIndex) {
-          newParts.push(part.substring(lastIndex, match.index));
+    return parts.map((part, i) => {
+      if (part.startsWith("[size:") && part.endsWith("[/size]")) {
+        const match = part.match(/\[size:(\d+)\](.*?)\[\/size\]/);
+        if (match) {
+          return <span key={i} style={{ fontSize: `${match[1]}px` }}>{renderFormattedText(match[2])}</span>;
         }
-        newParts.push(
-          <span key={`size-${match.index}`} style={{ fontSize: `${match[1]}px` }}>
-            {match[2]}
-          </span>
-        );
-        lastIndex = sizeRegex.lastIndex;
       }
-      if (lastIndex < part.length) {
-        newParts.push(part.substring(lastIndex));
+      if (part.startsWith("**") && part.endsWith("**")) {
+        return <strong key={i} className="font-black text-white">{renderFormattedText(part.slice(2, -2))}</strong>;
       }
+      if (part.startsWith("*") && part.endsWith("*")) {
+        return <em key={i} className="italic opacity-90">{renderFormattedText(part.slice(1, -1))}</em>;
+      }
+      return part;
     });
-    parts = newParts;
-
-    // 볼드 처리
-    newParts = [];
-    const boldRegex = /\*\*(.*?)\*\*/g;
-    parts.forEach(part => {
-      if (typeof part !== "string") {
-        newParts.push(part);
-        return;
-      }
-      let lastIndex = 0;
-      let match;
-      while ((match = boldRegex.exec(part)) !== null) {
-        if (match.index > lastIndex) {
-          newParts.push(part.substring(lastIndex, match.index));
-        }
-        newParts.push(<strong key={`bold-${match.index}`} className="font-black text-white">{match[1]}</strong>);
-        lastIndex = boldRegex.lastIndex;
-      }
-      if (lastIndex < part.length) {
-        newParts.push(part.substring(lastIndex));
-      }
-    });
-    parts = newParts;
-
-    // 이탤릭 처리
-    newParts = [];
-    const italicRegex = /\*(.*?)\*/g;
-    parts.forEach(part => {
-      if (typeof part !== "string") {
-        newParts.push(part);
-        return;
-      }
-      let lastIndex = 0;
-      let match;
-      while ((match = italicRegex.exec(part)) !== null) {
-        if (match.index > lastIndex) {
-          newParts.push(part.substring(lastIndex, match.index));
-        }
-        newParts.push(<em key={`italic-${match.index}`} className="italic opacity-90">{match[1]}</em>);
-        lastIndex = italicRegex.lastIndex;
-      }
-      if (lastIndex < part.length) {
-        newParts.push(part.substring(lastIndex));
-      }
-    });
-    
-    return newParts;
   };
 
   const menu = [
@@ -506,22 +449,36 @@ export default function Sidebar() {
                   )}
                   {logs.map((log) => {
                     if (editingId === log.id) return null;
+                    const isExpanded = expandedLogId === log.id;
+
                     return (
-                      <div key={log.id} className="relative pl-6 border-l-2 border-zinc-800 last:border-0 pb-1">
-                        <div className="absolute -left-[5px] top-1 w-2 h-2 rounded-full bg-lime-500 ring-4 ring-zinc-900" />
-                        <span className="text-[10px] font-black text-zinc-500 mb-1 block">{formatDate(log.created_at)}</span>
-                        <div className="flex items-start justify-between gap-2">
-                          <h4 className="font-black text-white mb-1" style={{ fontSize: "20px" }}>{log.title}</h4>
+                      <div key={log.id} className="relative pl-6 border-l-2 border-zinc-800 last:border-0 pb-4">
+                        <div className="absolute -left-[5px] top-2 w-2.5 h-2.5 rounded-full bg-lime-500 ring-4 ring-zinc-900" />
+                        
+                        <div className="flex items-center justify-between gap-4 group/title">
+                          <button 
+                            onClick={() => setExpandedLogId(isExpanded ? null : log.id)}
+                            className="flex-1 text-left hover:text-lime-500 transition-colors"
+                          >
+                            <h4 className="font-black text-white leading-tight flex items-center gap-2" style={{ fontSize: "30px" }}>
+                              {log.title}
+                              <FaChevronRight className={`text-sm transition-transform ${isExpanded ? "rotate-90" : ""}`} />
+                            </h4>
+                          </button>
+                          
                           {isAdmin && (
                             <div className="flex gap-1 shrink-0">
-                              <button onClick={() => openEdit(log)} className="p-1.5 text-zinc-500 hover:text-lime-500 rounded-lg" title="수정"><FaPen size={12} /></button>
-                              <button onClick={() => deleteLog(log.id)} className="p-1.5 text-zinc-500 hover:text-red-500 rounded-lg" title="삭제"><FaTrash size={12} /></button>
+                              <button onClick={(e) => { e.stopPropagation(); openEdit(log); }} className="p-2 text-zinc-500 hover:text-lime-500 rounded-lg" title="수정"><FaPen size={14} /></button>
+                              <button onClick={(e) => { e.stopPropagation(); deleteLog(log.id); }} className="p-2 text-zinc-500 hover:text-red-500 rounded-lg" title="삭제"><FaTrash size={14} /></button>
                             </div>
                           )}
                         </div>
-                        <div className="text-zinc-400 leading-relaxed whitespace-pre-wrap" style={{ fontSize: `${toFontSize(log.font_size)}px` }}>
-                          {renderFormattedText(log.desc)}
-                        </div>
+
+                        {isExpanded && (
+                          <div className="mt-4 text-zinc-400 leading-relaxed whitespace-pre-wrap animate-in fade-in slide-in-from-top-2 duration-200" style={{ fontSize: `${toFontSize(log.font_size) || 16}px` }}>
+                            {renderFormattedText(log.desc)}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
