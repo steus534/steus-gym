@@ -58,7 +58,13 @@ export default function Sidebar() {
       setIsAdmin(false);
       return;
     }
-    const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
+    const { data: profile, error } = await supabase.from("profiles").select("role").eq("id", user.id).single();
+    
+    if (error) {
+      console.error("관리자 확인 중 에러:", error);
+    }
+    console.log("현재 프로필 정보:", profile);
+    
     setIsAdmin(profile?.role === "admin");
   }, []);
 
@@ -87,17 +93,48 @@ export default function Sidebar() {
 
   const submitAdd = async () => {
     if (!form.title.trim()) return;
-    const { error } = await supabase.from("update_logs").insert([{
-      title: form.title.trim(),
-      desc: form.desc.trim(),
-      font_size: form.font_size,
-    }]);
-    if (error) {
-      console.error(error);
-      return;
+    
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        alert("로그인이 필요합니다.");
+        return;
+      }
+
+      // 작성 전 관리자 권한 최종 확인 (디버깅용)
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", session.user.id)
+        .single();
+      
+      console.log("작성 직전 권한 체크:", profile);
+
+      const insertData = {
+        title: form.title.trim(),
+        desc: form.desc.trim(),
+        font_size: form.font_size,
+      };
+
+      const { data, error } = await supabase
+        .from("update_logs")
+        .insert([insertData])
+        .select();
+
+      if (error) {
+        console.error("패치노트 작성 에러 전체:", error);
+        const errorMsg = JSON.stringify(error, null, 2);
+        alert(`작성 실패\n\n에러 내용: ${error.message}\n코드: ${error.code}\n상세: ${errorMsg}`);
+        return;
+      }
+      
+      console.log("작성 성공 데이터:", data);
+      await fetchLogs();
+      cancelForm();
+    } catch (err: any) {
+      console.error("시스템 에러:", err);
+      alert(`시스템 오류: ${err.message || "알 수 없는 오류"}`);
     }
-    await fetchLogs();
-    cancelForm();
   };
 
   const submitEdit = async () => {
@@ -106,10 +143,13 @@ export default function Sidebar() {
       .from("update_logs")
       .update({ title: form.title.trim(), desc: form.desc.trim(), font_size: form.font_size })
       .eq("id", editingId);
+    
     if (error) {
-      console.error(error);
+      console.error("패치노트 수정 에러 상세:", error);
+      alert(`수정 실패: ${error.message}`);
       return;
     }
+    
     await fetchLogs();
     cancelForm();
   };
