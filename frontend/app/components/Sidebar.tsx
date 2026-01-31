@@ -155,7 +155,12 @@ export default function Sidebar() {
   };
 
   const deleteLog = async (id: string) => {
-    if (!window.confirm("❗ 경고: 이 패치노트를 정말로 삭제하시겠습니까?\n이 작업은 되돌릴 수 없으며 모든 내용이 영구적으로 삭제됩니다.")) return;
+    console.log("삭제 시도 ID:", id);
+    if (!confirm("❗ 경고: 이 패치노트를 정말로 삭제하시겠습니까?\n이 작업은 되돌릴 수 없으며 모든 내용이 영구적으로 삭제됩니다.")) {
+      console.log("삭제 취소됨");
+      return;
+    }
+    console.log("삭제 진행 중...");
     const { error } = await supabase.from("update_logs").delete().eq("id", id);
     if (error) {
       console.error(error);
