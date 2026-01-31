@@ -110,7 +110,7 @@ export default function PostDetailPage() {
 
             <div className="text-zinc-300 text-lg border-t border-zinc-800/50 pt-12">{renderContent(post.content)}</div>
 
-            <CommentSection postId={String(id)} currentUser={user} isAdmin={isAdmin} onRefresh={fetchPost} />
+            <CommentSection postId={String(id)} currentUser={user} isAdmin={isAdmin} />
           </article>
         </div>
       </main>
