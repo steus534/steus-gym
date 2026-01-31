@@ -40,11 +40,11 @@ export async function GET(request: Request) {
     
     if (!error) {
       // 3. [성공 시] 로컬이면 로컬로, 배포면 배포로 리다이렉트
-      // 뒤에 /community나 /dashboard 등 원하는 경로 붙여도 됨
-      return NextResponse.redirect(`${origin}/community`);
+      // 뒤에 /blog나 /dashboard 등 원하는 경로 붙여도 됨
+      return NextResponse.redirect(`${origin}/blog`);
     }
   }
 
-  // 4. [실패 시] 에러 페이지나 홈으로
-  return NextResponse.redirect(`${origin}/auth/auth-code-error`);
+  // 4. [실패 시] 로그인 페이지로 (auth-code-error 페이지도 있음)
+  return NextResponse.redirect(`${origin}/login`);
 }

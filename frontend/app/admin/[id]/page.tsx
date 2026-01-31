@@ -4,19 +4,28 @@ import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import Sidebar from "../../components/Sidebar";
 import Link from "next/link";
-import { FaArrowLeft, FaEye, FaHeart, FaRegHeart, FaTrash, FaPen, FaComment, FaUndo } from "react-icons/fa";
+import { FaArrowLeft, FaEye, FaHeart, FaRegHeart, FaTrash, FaPen, FaUndo } from "react-icons/fa";
+import CommentSection from "../../components/CommentSection";
 
 export default function PostDetailPage() {
   const { id } = useParams();
   const router = useRouter();
   const [post, setPost] = useState<any>(null);
   const [user, setUser] = useState<any>(null);
-  const [commentInput, setCommentInput] = useState("");
+  const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => setUser(session?.user));
-    fetchPost();
+    const init = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        const { data: profile } = await supabase.from("profiles").select("role").eq("id", session.user.id).single();
+        if (profile?.role === "admin") setIsAdmin(true);
+      }
+      fetchPost();
+    };
+    init();
   }, [id]);
 
   const fetchPost = async () => {
@@ -100,8 +109,8 @@ export default function PostDetailPage() {
             </header>
 
             <div className="text-zinc-300 text-lg border-t border-zinc-800/50 pt-12">{renderContent(post.content)}</div>
-            
-            {/* 댓글 영역 생략(기존 유지) */}
+
+            <CommentSection postId={String(id)} currentUser={user} isAdmin={isAdmin} onRefresh={fetchPost} />
           </article>
         </div>
       </main>

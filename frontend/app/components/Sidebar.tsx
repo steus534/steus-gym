@@ -1,31 +1,135 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { 
-  FaHome, FaChartLine, FaTable, FaBook, FaCircleNotch, 
-  FaUtensils, FaHeartbeat, FaEdit, FaChevronRight, FaBars, FaTimes, FaHistory 
+import {
+  FaHome, FaChartLine, FaTable, FaBook, FaCircleNotch,
+  FaUtensils, FaHeartbeat, FaEdit, FaChevronRight, FaBars, FaTimes, FaHistory,
+  FaPlus, FaPen, FaTrash, FaBookmark
 } from "react-icons/fa";
 import AuthButton from "./AuthButton";
+import { supabase } from "@/lib/supabase";
 
-const UPDATE_HISTORY = [
-  { date: "2026.01.30", title: "모바일 UI 대규모 개편", desc: "메인 대시보드, 식단, 그래프 페이지 모바일 최적화 완료." },
-  { date: "2026.01.29", title: "관리자 기능 추가", desc: "커뮤니티 관리자 모드 (삭제된 글 복구/영구삭제) 기능 탑재." },
-  { date: "2026.01.28", title: "RPE & 원판 계산기", desc: "1RM 기반 RPE 계산기 및 바벨 원판 조합 계산기 기능 추가." },
-  { date: "2026.01.27", title: "성장 그래프 업데이트", desc: "3대 운동 1RM 추이 그래프 및 PL 포인트(Dots, Wilks) 자동 계산 적용." },
-  { date: "2026.01.20", title: "서비스 베타 오픈", desc: "GYM RAT 웹 서비스 배포 시작." },
-];
+const FONT_SIZE_MIN = 1;
+const FONT_SIZE_MAX = 30;
+const FONT_SIZE_DEFAULT = 11;
+
+export type UpdateLogEntry = {
+  id: string;
+  title: string;
+  desc: string;
+  font_size: number;
+  created_at: string;
+};
+
+function toFontSize(v: unknown): number {
+  const n = Number(v);
+  if (!Number.isFinite(n) || n < FONT_SIZE_MIN || n > FONT_SIZE_MAX) return FONT_SIZE_DEFAULT;
+  return Math.round(n);
+}
+
+function formatDate(iso: string) {
+  const d = new Date(iso);
+  return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
 
 export default function Sidebar() {
   const pathname = usePathname();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [showUpdates, setShowUpdates] = useState(false);
+  const [logs, setLogs] = useState<UpdateLogEntry[]>([]);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [form, setForm] = useState({ title: "", desc: "", font_size: FONT_SIZE_DEFAULT });
+
+  const fetchLogs = useCallback(async () => {
+    const { data } = await supabase
+      .from("update_logs")
+      .select("id, title, desc, font_size, created_at")
+      .order("created_at", { ascending: false });
+    setLogs((data as UpdateLogEntry[]) ?? []);
+  }, []);
+
+  const checkAdmin = useCallback(async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      setIsAdmin(false);
+      return;
+    }
+    const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
+    setIsAdmin(profile?.role === "admin");
+  }, []);
+
+  useEffect(() => {
+    if (showUpdates) {
+      setLoading(true);
+      Promise.all([fetchLogs(), checkAdmin()]).finally(() => setLoading(false));
+    }
+  }, [showUpdates, fetchLogs, checkAdmin]);
+
+  const openAdd = () => {
+    setEditingId(null);
+    setForm({ title: "", desc: "", font_size: FONT_SIZE_DEFAULT });
+    setShowAddForm(true);
+  };
+  const openEdit = (log: UpdateLogEntry) => {
+    setShowAddForm(false);
+    setEditingId(log.id);
+    setForm({ title: log.title, desc: log.desc, font_size: toFontSize(log.font_size) });
+  };
+  const cancelForm = () => {
+    setShowAddForm(false);
+    setEditingId(null);
+    setForm({ title: "", desc: "", font_size: FONT_SIZE_DEFAULT });
+  };
+
+  const submitAdd = async () => {
+    if (!form.title.trim()) return;
+    const { error } = await supabase.from("update_logs").insert([{
+      title: form.title.trim(),
+      desc: form.desc.trim(),
+      font_size: form.font_size,
+    }]);
+    if (error) {
+      console.error(error);
+      return;
+    }
+    await fetchLogs();
+    cancelForm();
+  };
+
+  const submitEdit = async () => {
+    if (!editingId || !form.title.trim()) return;
+    const { error } = await supabase
+      .from("update_logs")
+      .update({ title: form.title.trim(), desc: form.desc.trim(), font_size: form.font_size })
+      .eq("id", editingId);
+    if (error) {
+      console.error(error);
+      return;
+    }
+    await fetchLogs();
+    cancelForm();
+  };
+
+  const deleteLog = async (id: string) => {
+    if (!confirm("이 업데이트 로그를 삭제할까요?")) return;
+    const { error } = await supabase.from("update_logs").delete().eq("id", id);
+    if (error) {
+      console.error(error);
+      return;
+    }
+    await fetchLogs();
+    if (editingId === id) cancelForm();
+  };
 
   const menu = [
     { name: "메인 (스펙분석)", path: "/", icon: <FaHome /> },
-    { 
-      name: "식단 가이드", 
-      path: "/diet", 
+    {
+      name: "식단 가이드",
+      path: "/diet",
       icon: <FaUtensils />,
       sub: [
         { name: "영양소 정보", path: "/diet/info" },
@@ -33,7 +137,7 @@ export default function Sidebar() {
       ]
     },
     { name: "성장 그래프", path: "/history", icon: <FaChartLine /> },
-    { name: "커뮤니티", path: "/community", icon: <FaEdit /> },
+    { name: "블로그", path: "/blog", icon: <FaEdit /> },
     { name: "프로그램 가이드", path: "/programs", icon: <FaBook /> },
     { name: "유산소 가이드", path: "/cardio", icon: <FaHeartbeat /> },
     { name: "RPE 계산기", path: "/rpe", icon: <FaTable /> },
@@ -42,7 +146,7 @@ export default function Sidebar() {
 
   return (
     <>
-      <button 
+      <button
         onClick={() => setIsMobileOpen(true)}
         className="md:hidden fixed top-4 left-4 z-50 p-3 bg-zinc-900 text-white rounded-xl shadow-lg border border-zinc-800 hover:text-lime-500 transition-colors"
       >
@@ -50,7 +154,7 @@ export default function Sidebar() {
       </button>
 
       {isMobileOpen && (
-        <div 
+        <div
           onClick={() => setIsMobileOpen(false)}
           className="fixed inset-0 bg-black/80 z-[60] md:hidden backdrop-blur-sm transition-opacity"
         />
@@ -59,7 +163,6 @@ export default function Sidebar() {
       <aside className={`
         bg-zinc-900 text-white flex flex-col border-r border-zinc-800 
         h-[100dvh] md:h-screen
-        /* [수정 1] overflow-hidden으로 변경 (전체 스크롤 방지) */
         overflow-hidden transition-all duration-300 ease-in-out z-[70]
         fixed inset-y-0 left-0 w-64 
         ${isMobileOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full"}
@@ -70,8 +173,7 @@ export default function Sidebar() {
         
         xl:w-64 xl:hover:w-64
       `}>
-        
-        {/* 상단 로고 (고정) */}
+
         <div className="flex items-center justify-between p-6 h-20 shrink-0">
           <div className="flex items-center gap-3 overflow-hidden whitespace-nowrap">
             <div className="w-8 h-8 min-w-[2rem] bg-lime-500 rounded-lg flex items-center justify-center font-black text-black italic shrink-0">G</div>
@@ -84,28 +186,27 @@ export default function Sidebar() {
           </button>
         </div>
 
-        {/* [수정 2] 메뉴 영역에만 overflow-y-auto 적용 (여기만 스크롤됨) */}
         <nav className="flex-1 px-3 space-y-2 w-full overflow-y-auto custom-scrollbar">
           {menu.map((item) => {
             const isActive = item.path === "/" ? pathname === "/" : pathname.startsWith(item.path);
 
             return (
               <div key={item.path} className="group/item relative">
-                <Link 
-                  href={item.sub ? item.sub[0].path : item.path} 
+                <Link
+                  href={item.sub ? item.sub[0].path : item.path}
                   onClick={() => setIsMobileOpen(false)}
                   className={`flex items-center p-3 rounded-xl transition-all overflow-hidden whitespace-nowrap ${
-                    isActive 
-                      ? "bg-lime-500 text-black font-bold" 
+                    isActive
+                      ? "bg-lime-500 text-black font-bold"
                       : "text-zinc-400 hover:bg-zinc-800 hover:text-white"
                   }`}
                 >
                   <span className="text-xl min-w-[1.5rem] flex justify-center shrink-0">{item.icon}</span>
-                  
+
                   <span className="ml-4 opacity-100 transition-opacity duration-300 md:opacity-0 md:group-hover/sidebar:opacity-100 xl:opacity-100 delay-75">
                     {item.name}
                   </span>
-                  
+
                   {item.sub && (
                     <FaChevronRight className={`ml-auto text-[10px] opacity-50 md:hidden md:group-hover/sidebar:block xl:block ${isActive ? "rotate-90" : ""}`} />
                   )}
@@ -114,9 +215,9 @@ export default function Sidebar() {
                 {item.sub && (
                   <div className={`pl-12 mt-1 space-y-1 ${isActive ? "block" : "hidden group-hover/item:block"} md:hidden md:group-hover/sidebar:block xl:block`}>
                     {item.sub.map((s) => (
-                      <Link 
-                        key={s.path} 
-                        href={s.path} 
+                      <Link
+                        key={s.path}
+                        href={s.path}
                         onClick={() => setIsMobileOpen(false)}
                         className={`block p-2 text-sm font-bold rounded-lg transition-colors truncate ${
                           pathname === s.path ? "text-lime-500" : "text-zinc-500 hover:text-white"
@@ -132,9 +233,8 @@ export default function Sidebar() {
           })}
         </nav>
 
-        {/* 하단 버튼 (고정) */}
         <div className="p-4 pb-8 md:pb-4 border-t border-zinc-800 shrink-0 flex flex-col gap-2 bg-zinc-900">
-          <button 
+          <button
             onClick={() => setShowUpdates(true)}
             className="w-full flex items-center gap-3 p-2 rounded-lg text-zinc-500 hover:text-lime-500 hover:bg-zinc-800 transition-all text-xs font-bold md:justify-center md:group-hover/sidebar:justify-start xl:justify-start"
           >
@@ -151,25 +251,100 @@ export default function Sidebar() {
         </div>
       </aside>
 
-      {/* 모달 (기존 동일) */}
       {showUpdates && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm" onClick={() => setShowUpdates(false)}>
-          <div className="bg-zinc-900 border border-zinc-800 w-full max-w-md max-h-[80vh] rounded-3xl shadow-2xl flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
+          <div className="bg-zinc-900 border border-zinc-800 w-full max-w-md max-h-[85vh] rounded-3xl shadow-2xl flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
             <div className="p-6 border-b border-zinc-800 flex justify-between items-center bg-zinc-950">
               <h3 className="text-xl font-black italic text-white flex items-center gap-2">
-                <FaHistory className="text-lime-500"/> PATCH NOTES
+                <FaHistory className="text-lime-500" /> PATCH NOTES
               </h3>
-              <button onClick={() => setShowUpdates(false)} className="text-zinc-500 hover:text-white"><FaTimes/></button>
+              <button onClick={() => setShowUpdates(false)} className="text-zinc-500 hover:text-white"><FaTimes /></button>
             </div>
-            <div className="p-6 overflow-y-auto custom-scrollbar space-y-6">
-              {UPDATE_HISTORY.map((log, idx) => (
-                <div key={idx} className="relative pl-6 border-l-2 border-zinc-800 last:border-0 pb-1">
-                  <div className="absolute -left-[5px] top-1 w-2 h-2 rounded-full bg-lime-500 ring-4 ring-zinc-900"></div>
-                  <span className="text-[10px] font-black text-zinc-500 mb-1 block">{log.date}</span>
-                  <h4 className="text-sm font-bold text-white mb-1">{log.title}</h4>
-                  <p className="text-xs text-zinc-400 leading-relaxed">{log.desc}</p>
-                </div>
-              ))}
+
+            <div className="p-6 overflow-y-auto custom-scrollbar flex-1 space-y-6">
+              {loading ? (
+                <p className="text-zinc-500 text-sm">로딩 중...</p>
+              ) : (
+                <>
+                  {isAdmin && (
+                    <div className="flex gap-2">
+                      {!showAddForm && !editingId && (
+                        <button
+                          onClick={openAdd}
+                          className="flex items-center gap-2 px-4 py-2.5 bg-lime-500 text-black font-black rounded-xl text-xs hover:bg-lime-400 transition-colors"
+                        >
+                          <FaPlus size={12} /> 로그 추가
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  {(showAddForm || editingId) && (
+                    <div className="p-4 rounded-2xl border border-zinc-700 bg-zinc-950 space-y-3">
+                      <h4 className="text-sm font-bold text-white">{editingId ? "수정" : "새 로그"}</h4>
+                      <input
+                        value={form.title}
+                        onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
+                        placeholder="제목"
+                        className="w-full px-3 py-2 rounded-lg bg-zinc-800 text-white text-sm placeholder-zinc-500 border border-zinc-700 focus:border-lime-500 outline-none"
+                      />
+                      <textarea
+                        value={form.desc}
+                        onChange={e => setForm(f => ({ ...f, desc: e.target.value }))}
+                        placeholder="내용"
+                        rows={3}
+                        className="w-full px-3 py-2 rounded-lg bg-zinc-800 text-white text-sm placeholder-zinc-500 border border-zinc-700 focus:border-lime-500 outline-none resize-none"
+                      />
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-zinc-500">텍스트 크기:</span>
+                        <select
+                          value={form.font_size}
+                          onChange={e => setForm(f => ({ ...f, font_size: toFontSize(e.target.value) }))}
+                          className="px-3 py-1.5 rounded-lg bg-zinc-800 text-white text-xs border border-zinc-700 focus:border-lime-500 outline-none"
+                        >
+                          {Array.from({ length: FONT_SIZE_MAX - FONT_SIZE_MIN + 1 }, (_, i) => FONT_SIZE_MIN + i).map(n => (
+                            <option key={n} value={n}>{n}px</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={editingId ? submitEdit : submitAdd}
+                          className="px-4 py-2 bg-lime-500 text-black font-bold rounded-xl text-xs hover:bg-lime-400"
+                        >
+                          {editingId ? "저장" : "추가"}
+                        </button>
+                        <button onClick={cancelForm} className="px-4 py-2 bg-zinc-700 text-white font-bold rounded-xl text-xs hover:bg-zinc-600">
+                          취소
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {logs.length === 0 && !showAddForm && !editingId && (
+                    <p className="text-zinc-500 text-sm">등록된 업데이트가 없습니다.</p>
+                  )}
+                  {logs.map((log) => {
+                    if (editingId === log.id) return null;
+                    return (
+                      <div key={log.id} className="relative pl-6 border-l-2 border-zinc-800 last:border-0 pb-1">
+                        <div className="absolute -left-[5px] top-1 w-2 h-2 rounded-full bg-lime-500 ring-4 ring-zinc-900" />
+                        <span className="text-[10px] font-black text-zinc-500 mb-1 block">{formatDate(log.created_at)}</span>
+                        <div className="flex items-start justify-between gap-2">
+                          <h4 className="font-bold text-white mb-1" style={{ fontSize: `${toFontSize(log.font_size)}px` }}>{log.title}</h4>
+                          {isAdmin && (
+                            <div className="flex gap-1 shrink-0">
+                              <button onClick={() => openEdit(log)} className="p-1.5 text-zinc-500 hover:text-lime-500 rounded-lg" title="수정"><FaPen size={12} /></button>
+                              <button onClick={() => deleteLog(log.id)} className="p-1.5 text-zinc-500 hover:text-red-500 rounded-lg" title="삭제"><FaTrash size={12} /></button>
+                            </div>
+                          )}
+                        </div>
+                        <p className="text-zinc-400 leading-relaxed" style={{ fontSize: `${toFontSize(log.font_size)}px` }}>{log.desc}</p>
+                      </div>
+                    );
+                  })}
+                </>
+              )}
             </div>
             <div className="p-4 border-t border-zinc-800 bg-zinc-950">
               <button onClick={() => setShowUpdates(false)} className="w-full py-3 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-xs font-bold text-white transition-colors">닫기</button>

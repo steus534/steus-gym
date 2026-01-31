@@ -15,8 +15,20 @@ export default function NewPostPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => setUser(session?.user));
-  }, []);
+    const check = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setUser(session?.user ?? null);
+      if (!session?.user) {
+        router.replace("/blog");
+        return;
+      }
+      const { data: profile } = await supabase.from("profiles").select("role").eq("id", session.user.id).single();
+      if (profile?.role !== "admin") {
+        router.replace("/blog");
+      }
+    };
+    check();
+  }, [router]);
 
   const handlePhotoUpload = async (e: any) => {
     const file = e.target.files[0];
