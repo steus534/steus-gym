@@ -155,14 +155,129 @@ export default function Sidebar() {
   };
 
   const deleteLog = async (id: string) => {
-    if (!confirm("이 업데이트 로그를 삭제할까요?")) return;
+    if (!window.confirm("❗ 경고: 이 패치노트를 정말로 삭제하시겠습니까?\n이 작업은 되돌릴 수 없으며 모든 내용이 영구적으로 삭제됩니다.")) return;
     const { error } = await supabase.from("update_logs").delete().eq("id", id);
     if (error) {
       console.error(error);
+      alert("삭제에 실패했습니다.");
       return;
     }
     await fetchLogs();
     if (editingId === id) cancelForm();
+  };
+
+  // --- [서식 적용 헬퍼] ---
+  const applyFormat = (type: "bold" | "italic" | "size", value?: string) => {
+    const textarea = document.getElementById("log-desc-textarea") as HTMLTextAreaElement;
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const selectedText = form.desc.substring(start, end);
+    let newText = "";
+
+    if (type === "bold") {
+      newText = `**${selectedText || "굵은글씨"}**`;
+    } else if (type === "italic") {
+      newText = `*${selectedText || "기울임"}*`;
+    } else if (type === "size") {
+      newText = `[size:${value}]${selectedText || "크기조절"} [/size]`;
+    }
+
+    const updatedDesc = form.desc.substring(0, start) + newText + form.desc.substring(end);
+    setForm({ ...form, desc: updatedDesc });
+    
+    // 포커스 유지
+    setTimeout(() => {
+      textarea.focus();
+      textarea.setSelectionRange(start + newText.length, start + newText.length);
+    }, 10);
+  };
+
+  const renderFormattedText = (text: string) => {
+    if (!text) return null;
+
+    // 1. 사이즈 태그 처리: [size:20]...[/size]
+    // 2. 볼드 처리: **...**
+    // 3. 이탤릭 처리: *...*
+    
+    let parts: (string | JSX.Element)[] = [text];
+
+    // 사이즈 처리
+    const sizeRegex = /\[size:(\d+)\](.*?)\[\/size\]/g;
+    let newParts: (string | JSX.Element)[] = [];
+    
+    parts.forEach(part => {
+      if (typeof part !== "string") {
+        newParts.push(part);
+        return;
+      }
+      
+      let lastIndex = 0;
+      let match;
+      while ((match = sizeRegex.exec(part)) !== null) {
+        if (match.index > lastIndex) {
+          newParts.push(part.substring(lastIndex, match.index));
+        }
+        newParts.push(
+          <span key={`size-${match.index}`} style={{ fontSize: `${match[1]}px` }}>
+            {match[2]}
+          </span>
+        );
+        lastIndex = sizeRegex.lastIndex;
+      }
+      if (lastIndex < part.length) {
+        newParts.push(part.substring(lastIndex));
+      }
+    });
+    parts = newParts;
+
+    // 볼드 처리
+    newParts = [];
+    const boldRegex = /\*\*(.*?)\*\*/g;
+    parts.forEach(part => {
+      if (typeof part !== "string") {
+        newParts.push(part);
+        return;
+      }
+      let lastIndex = 0;
+      let match;
+      while ((match = boldRegex.exec(part)) !== null) {
+        if (match.index > lastIndex) {
+          newParts.push(part.substring(lastIndex, match.index));
+        }
+        newParts.push(<strong key={`bold-${match.index}`} className="font-black text-white">{match[1]}</strong>);
+        lastIndex = boldRegex.lastIndex;
+      }
+      if (lastIndex < part.length) {
+        newParts.push(part.substring(lastIndex));
+      }
+    });
+    parts = newParts;
+
+    // 이탤릭 처리
+    newParts = [];
+    const italicRegex = /\*(.*?)\*/g;
+    parts.forEach(part => {
+      if (typeof part !== "string") {
+        newParts.push(part);
+        return;
+      }
+      let lastIndex = 0;
+      let match;
+      while ((match = italicRegex.exec(part)) !== null) {
+        if (match.index > lastIndex) {
+          newParts.push(part.substring(lastIndex, match.index));
+        }
+        newParts.push(<em key={`italic-${match.index}`} className="italic opacity-90">{match[1]}</em>);
+        lastIndex = italicRegex.lastIndex;
+      }
+      if (lastIndex < part.length) {
+        newParts.push(part.substring(lastIndex));
+      }
+    });
+    
+    return newParts;
   };
 
   const menu = [
@@ -293,7 +408,7 @@ export default function Sidebar() {
 
       {showUpdates && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm" onClick={() => setShowUpdates(false)}>
-          <div className="bg-zinc-900 border border-zinc-800 w-full max-w-md max-h-[85vh] rounded-3xl shadow-2xl flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
+          <div className="bg-zinc-900 border border-zinc-800 w-full max-w-3xl max-h-[90vh] rounded-3xl shadow-2xl flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
             <div className="p-6 border-b border-zinc-800 flex justify-between items-center bg-zinc-950">
               <h3 className="text-xl font-black italic text-white flex items-center gap-2">
                 <FaHistory className="text-lime-500" /> PATCH NOTES
@@ -326,17 +441,37 @@ export default function Sidebar() {
                         value={form.title}
                         onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
                         placeholder="제목"
-                        className="w-full px-3 py-2 rounded-lg bg-zinc-800 text-white text-sm placeholder-zinc-500 border border-zinc-700 focus:border-lime-500 outline-none"
+                        className="w-full px-3 py-2 rounded-lg bg-zinc-800 text-white font-bold placeholder-zinc-500 border border-zinc-700 focus:border-lime-500 outline-none"
+                        style={{ fontSize: "18px" }}
                       />
+                      
+                      {/* 서식 툴바 */}
+                      <div className="flex flex-wrap items-center gap-1 p-1 bg-zinc-900 rounded-lg border border-zinc-800">
+                        <button onClick={() => applyFormat("bold")} className="p-2 w-8 h-8 flex items-center justify-center rounded bg-zinc-800 hover:bg-zinc-700 text-white font-black text-xs" title="Bold">B</button>
+                        <button onClick={() => applyFormat("italic")} className="p-2 w-8 h-8 flex items-center justify-center rounded bg-zinc-800 hover:bg-zinc-700 text-white italic text-xs" title="Italic">I</button>
+                        <div className="w-px h-4 bg-zinc-700 mx-1" />
+                        <span className="text-[10px] text-zinc-500 ml-1">Size:</span>
+                        {[10, 12, 14, 16, 18, 20, 24].map(size => (
+                          <button 
+                            key={size} 
+                            onClick={() => applyFormat("size", String(size))}
+                            className="px-1.5 py-1 rounded hover:bg-zinc-700 text-[10px] text-zinc-400"
+                          >
+                            {size}
+                          </button>
+                        ))}
+                      </div>
+
                       <textarea
+                        id="log-desc-textarea"
                         value={form.desc}
                         onChange={e => setForm(f => ({ ...f, desc: e.target.value }))}
-                        placeholder="내용"
-                        rows={3}
-                        className="w-full px-3 py-2 rounded-lg bg-zinc-800 text-white text-sm placeholder-zinc-500 border border-zinc-700 focus:border-lime-500 outline-none resize-none"
+                        placeholder="내용 (**굵게**, *기울임*, 버튼 클릭으로 서식 적용)"
+                        rows={10}
+                        className="w-full px-3 py-2 rounded-lg bg-zinc-800 text-white text-sm placeholder-zinc-500 border border-zinc-700 focus:border-lime-500 outline-none resize-none font-mono"
                       />
                       <div className="flex items-center gap-2">
-                        <span className="text-xs text-zinc-500">텍스트 크기:</span>
+                        <span className="text-xs text-zinc-500">기본 텍스트 크기:</span>
                         <select
                           value={form.font_size}
                           onChange={e => setForm(f => ({ ...f, font_size: toFontSize(e.target.value) }))}
@@ -371,7 +506,7 @@ export default function Sidebar() {
                         <div className="absolute -left-[5px] top-1 w-2 h-2 rounded-full bg-lime-500 ring-4 ring-zinc-900" />
                         <span className="text-[10px] font-black text-zinc-500 mb-1 block">{formatDate(log.created_at)}</span>
                         <div className="flex items-start justify-between gap-2">
-                          <h4 className="font-bold text-white mb-1" style={{ fontSize: `${toFontSize(log.font_size)}px` }}>{log.title}</h4>
+                          <h4 className="font-black text-white mb-1" style={{ fontSize: "20px" }}>{log.title}</h4>
                           {isAdmin && (
                             <div className="flex gap-1 shrink-0">
                               <button onClick={() => openEdit(log)} className="p-1.5 text-zinc-500 hover:text-lime-500 rounded-lg" title="수정"><FaPen size={12} /></button>
@@ -379,7 +514,9 @@ export default function Sidebar() {
                             </div>
                           )}
                         </div>
-                        <p className="text-zinc-400 leading-relaxed" style={{ fontSize: `${toFontSize(log.font_size)}px` }}>{log.desc}</p>
+                        <div className="text-zinc-400 leading-relaxed whitespace-pre-wrap" style={{ fontSize: `${toFontSize(log.font_size)}px` }}>
+                          {renderFormattedText(log.desc)}
+                        </div>
                       </div>
                     );
                   })}
